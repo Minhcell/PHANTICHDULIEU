@@ -3,133 +3,84 @@
 <head>
 <meta charset="utf-8">
 <title>Phân tích Cuộc gọi / SMS</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 :root{
-  --blue:#1e4fbf;--blue-d:#173f99;--blue-soft:#e8eefc;--green:#0f7a52;--red:#c4362b;--yellow:#b86e00;
-  --bg:#f3f5f8;--card:#fff;--border:#dde2ea;--text:#16202e;--muted:#5f6b7a;
+  --blue:#1a56db;--green:#057a55;--red:#c81e1e;--yellow:#c27803;
+  --bg:#f3f4f6;--card:#fff;--border:#e5e7eb;--text:#111827;--muted:#6b7280;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{background:var(--bg);}
-body{font-family:'Segoe UI',Roboto,system-ui,sans-serif;color:var(--text);font-size:14px;line-height:1.45;padding-bottom:env(safe-area-inset-bottom,0px);}
-header{background:linear-gradient(90deg,var(--blue-d),var(--blue));color:#fff;padding:9px max(16px,env(safe-area-inset-left,0px));padding-top:calc(9px + env(safe-area-inset-top,0px));display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;position:sticky;top:0;z-index:40;box-shadow:0 1px 4px rgba(0,0,0,.18);}
-header h1{font-size:16px;font-weight:700;letter-spacing:.1px;white-space:nowrap;}
-.hdr-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;min-width:0;}
-.btn{padding:6px 13px;border:1px solid transparent;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;line-height:1.3;transition:filter .15s,background .15s;font-family:inherit;}
-.btn:hover{filter:brightness(.93);}
-.btn:focus-visible,.tab:focus-visible,.btn-hdr:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;}
+header{background:var(--blue);color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 6px rgba(0,0,0,.2);}
+header h1{font-size:17px;font-weight:700;}
+.btn{padding:7px 16px;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;transition:.2s;}
+.btn:hover{filter:brightness(.92);}
 .btn-blue{background:var(--blue);color:#fff;}
 .btn-green{background:var(--green);color:#fff;}
 .btn-red{background:var(--red);color:#fff;}
 .btn-yellow{background:var(--yellow);color:#fff;}
-.btn-ghost{background:#fff;border-color:var(--border);color:var(--text);}
-.btn-sm{padding:3px 9px;font-size:12px;}
-.btn-hdr{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4);color:#fff;padding:4px 11px;border-radius:5px;cursor:pointer;font-size:12.5px;font-family:inherit;white-space:nowrap;}
-.btn-hdr:hover{background:rgba(255,255,255,.26);}
+.btn-ghost{background:#fff;border:1px solid var(--border);color:var(--text);}
+.btn-sm{padding:4px 10px;font-size:12px;}
+.btn-hdr{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;padding:5px 14px;border-radius:5px;cursor:pointer;font-size:13px;}
+.btn-hdr:hover{background:rgba(255,255,255,.25);}
 .hidden{display:none!important;}
-.overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:999;padding:16px;}
-.modal{background:#fff;border-radius:10px;padding:18px 20px;width:360px;max-width:100%;max-height:calc(100vh - 32px);overflow:auto;box-shadow:0 10px 30px rgba(0,0,0,.2);}
-.modal h3{color:var(--blue);margin-bottom:10px;font-size:15.5px;}
-.modal label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px;font-weight:600;}
-.modal input,.modal select{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;outline:none;font-family:inherit;}
-.modal input:focus{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-soft);}
-.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap;}
-#analysis{padding:12px max(16px,env(safe-area-inset-left,0px)) 24px;max-width:1600px;margin:0 auto;}
-.tabs{display:flex;gap:2px;margin-bottom:10px;border-bottom:2px solid var(--border);overflow-x:auto;}
-.tab{padding:7px 16px;border:none;background:none;cursor:pointer;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;font-size:14px;white-space:nowrap;font-family:inherit;}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:999;}
+.modal{background:#fff;border-radius:10px;padding:22px 24px;width:360px;box-shadow:0 8px 30px rgba(0,0,0,.2);}
+.modal h3{color:var(--blue);margin-bottom:14px;font-size:16px;}
+.modal label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px;}
+.modal input,.modal select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none;}
+.modal input:focus{border-color:var(--blue);}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+#analysis{padding:14px 20px;}
+.tabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:2px solid var(--border);}
+.tab{padding:8px 20px;border:none;background:none;cursor:pointer;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;font-size:14px;}
 .tab.active{color:var(--blue);border-bottom-color:var(--blue);}
-.panel{background:var(--card);border-radius:8px;padding:12px 14px;border:1px solid var(--border);}
-.filter-row{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-end;margin-bottom:10px;}
-.filter-group{display:flex;flex-direction:column;gap:3px;min-width:0;}
-.filter-group label{font-size:11.5px;color:var(--muted);font-weight:600;}
-.filter-group input,.filter-group select{padding:5px 8px;border:1px solid var(--border);border-radius:5px;font-size:13px;min-width:130px;max-width:100%;font-family:inherit;background:#fff;height:32px;}
-.filter-group input[type=file]{height:auto;padding:4px 6px;}
-.filter-group input:focus,.filter-group select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-soft);}
+.panel{background:var(--card);border-radius:8px;padding:16px;border:1px solid var(--border);}
+.filter-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px;}
+.filter-group{display:flex;flex-direction:column;gap:3px;}
+.filter-group label{font-size:12px;color:var(--muted);font-weight:600;}
+.filter-group input,.filter-group select{padding:6px 9px;border:1px solid var(--border);border-radius:5px;font-size:13px;min-width:130px;}
 .date-wrap{position:relative;display:flex;align-items:center;}
 .date-wrap input.date-text{padding-right:52px;min-width:140px;}
-.date-wrap .cal-btn{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:15px;padding:0 3px;line-height:1;}
-.date-wrap .clear-btn{position:absolute;right:28px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:13px;color:#999;padding:0 3px;line-height:1;display:none;}
+.date-wrap .cal-btn{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;padding:0 3px;line-height:1;}
+.date-wrap .clear-btn{position:absolute;right:28px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:#999;padding:0 3px;line-height:1;display:none;}
 .date-wrap .clear-btn:hover{color:var(--red);}
-.date-wrap input.date-native{position:absolute;right:4px;width:22px;min-width:0;opacity:0;cursor:pointer;}
-.btn-row{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center;}
+.date-wrap input.date-native{position:absolute;right:4px;width:22px;opacity:0;cursor:pointer;}
+.btn-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;}
 .prog-wrap{margin-bottom:8px;display:none;}
-.prog-bar{height:5px;background:#e5e7eb;border-radius:3px;overflow:hidden;}
+.prog-bar{height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;}
 .prog-fill{height:100%;background:var(--blue);width:0%;transition:width .15s;}
 .prog-txt{font-size:12px;color:var(--muted);margin-top:3px;}
 .result-info{font-size:13px;margin-bottom:6px;}
 .status-idle{color:var(--muted);}
 .status-ok{color:var(--green);font-weight:600;}
 .status-err{color:var(--red);}
-.rtable-wrap{border:1px solid var(--border);border-radius:6px;overflow:auto;max-height:calc(100vh - 290px);min-height:200px;margin-top:4px;}
-table.rtable{border-collapse:collapse;width:100%;font-size:12.5px;}
-table.rtable th{background:var(--blue);color:#fff;padding:6px 8px;text-align:left;position:sticky;top:0;white-space:nowrap;z-index:2;font-weight:600;}
-table.rtable td{padding:5px 8px;border-bottom:1px solid #edf0f4;vertical-align:top;max-width:280px;word-break:break-word;}
-table.rtable tr:nth-child(even) td{background:#f8fafc;}
-table.rtable tr:hover td{background:var(--blue-soft);}
+.rtable-wrap{border:1px solid var(--border);border-radius:6px;overflow:auto;max-height:560px;margin-top:6px;}
+table.rtable{border-collapse:collapse;width:100%;font-size:12px;}
+table.rtable th{background:var(--blue);color:#fff;padding:7px 9px;text-align:left;position:sticky;top:0;white-space:nowrap;z-index:2;}
+table.rtable td{padding:6px 9px;border-bottom:1px solid var(--border);vertical-align:top;max-width:280px;word-break:break-word;}
+table.rtable tr:nth-child(even) td{background:#f9fafb;}
+table.rtable tr:hover td{background:#eff6ff;}
 .imei-box{position:relative;}
-.imei-dropdown{position:absolute;top:100%;left:0;right:0;min-width:220px;background:#fff;border:1px solid var(--border);border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.15);max-height:240px;overflow-y:auto;z-index:50;display:none;}
+.imei-dropdown{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.15);max-height:240px;overflow-y:auto;z-index:50;display:none;}
 .imei-dropdown.show{display:block;}
-.imei-item{padding:6px 10px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:7px;border-bottom:1px solid #f1f1f1;}
-.imei-item:hover{background:var(--blue-soft);}
-.imei-item input{width:auto;min-width:auto;height:auto;}
-.acc-item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;word-break:break-all;}
-#authArea{display:flex;justify-content:center;gap:10px;padding:48px 16px;flex-wrap:wrap;}
-#authArea .btn{padding:9px 18px;font-size:14px;}
+.imei-item{padding:7px 10px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:7px;border-bottom:1px solid #f1f1f1;}
+.imei-item:hover{background:#eff6ff;}
+.imei-item input{width:auto;min-width:auto;}
+.acc-item{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;}
+#authArea{display:flex;justify-content:center;gap:10px;padding:40px 20px;}
 .dev-note{padding:30px;text-align:center;color:var(--muted);font-size:15px;}
-/* kho dữ liệu / mạng LAN */
-.kho-folder{font-size:11.5px;opacity:.85;max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.lan-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.45);margin-right:5px;vertical-align:middle;}
-.lan-dot.on{background:#4ade80;}
-.kho-note{font-size:12.5px;color:var(--muted);margin:4px 0;}
-.kho-path{font-family:Consolas,monospace;font-size:12.5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;word-break:break-all;margin:6px 0;user-select:all;}
-.kho-sep{border:0;border-top:1px solid var(--border);margin:12px 0 6px;}
-.kho-msg{font-size:12.5px;margin-top:6px;}
-.kho-msg.err{color:var(--red);} .kho-msg.ok{color:var(--green);}
-.kho-row2{display:grid;grid-template-columns:1.4fr 1fr;gap:8px;}
-.modal label.kho-chk{display:flex;align-items:center;gap:8px;color:var(--text);font-size:13px;font-weight:600;}
-.modal label.kho-chk input{width:auto;}
-@media (max-width:700px){
-  header h1{font-size:14.5px;}
-  .filter-group{flex:1 1 calc(50% - 10px);}
-  .filter-group input,.filter-group select,.date-wrap input.date-text{min-width:0;width:100%;}
-  .rtable-wrap{max-height:70vh;}
-  .kho-row2{grid-template-columns:1fr;}
-}
-@media (max-width:440px){ .filter-group{flex:1 1 100%;} }
 </style>
 </head>
 <body>
 
 <header>
   <h1>📊 Phân tích Cuộc gọi / SMS</h1>
-  <div class="hdr-right">
-    <span id="kho-folder" class="kho-folder"></span>
-    <button id="btnLan" class="btn-hdr hidden" type="button"><span id="lanDot" class="lan-dot"></span>Mạng LAN</button>
-    <span id="hdrUser" style="font-size:13px;opacity:.85"></span>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span id="hdrUser" style="font-size:13px;opacity:.8"></span>
     <button id="btnLogout" class="btn-hdr hidden" onclick="doLogout()">⬅ Thoát</button>
   </div>
 </header>
-
-<!-- CHỌN NƠI LƯU DỮ LIỆU (lần đầu chạy exe/apk) -->
-<div id="kho-setup" class="overlay hidden"><div class="modal" style="width:500px">
-  <h3>Chọn nơi lưu dữ liệu</h3>
-  <p class="kho-note">Tài khoản, các tệp đã phân tích và file kết quả xuất ra đều lưu trong thư mục này.</p>
-  <div class="kho-path" id="kho-setup-path">Chưa chọn thư mục.</div>
-  <p class="kho-note" id="kho-setup-note"></p>
-  <div class="modal-actions" style="justify-content:flex-start">
-    <button class="btn btn-ghost" type="button" id="kho-setup-pick">Chọn thư mục…</button>
-    <button class="btn btn-blue" type="button" id="kho-setup-ok" disabled>OK</button>
-  </div>
-  <div class="kho-msg err" id="kho-setup-msg"></div>
-  <hr class="kho-sep"><div id="kho-setup-cf"></div>
-</div></div>
-
-<!-- MẠNG LAN -->
-<div id="kho-lan" class="overlay hidden"><div class="modal" style="width:500px">
-  <h3>🖧 Mạng LAN nội bộ</h3>
-  <div id="kho-lan-body"></div>
-  <div class="modal-actions"><button class="btn btn-ghost" type="button" id="kho-lan-close">Đóng</button></div>
-</div></div>
 
 <!-- AUTH -->
 <div id="authArea">
@@ -207,281 +158,36 @@ table.rtable tr:hover td{background:var(--blue-soft);}
 <script src="xlsx.full.min.js"></script>
 <script>
 /* ================================================================
-   KHO DỮ LIỆU & MẠNG LAN (thêm mới)
-   - exe: lưu trong thư mục đã chọn, có thể làm máy chủ LAN
-   - apk: lưu trong thư mục đã chọn, có thể kết nối máy chủ LAN
-   - trình duyệt mở từ máy chủ LAN: dùng dữ liệu máy chủ
-   Dữ liệu dùng chung: tài khoản người dùng, mật khẩu admin, tệp đã phân tích, kết quả xuất.
-   ================================================================ */
-const KHO=(function(){
-  const N=window.NativeStore, A=window.AndroidStore;
-  const served=/^https?:$/.test(location.protocol)&&!N&&!A;
-  const SHARED=['pa_users','pa_adm_pass'];
-  const DEF_PORT=6868;
-  const $=id=>document.getElementById(id);
-  const e=s=>(''+(s==null?'':s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  let B=null, cache={}, ver=null;
-
-  const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}};
-  const lsSet=(k,v)=>{try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,JSON.stringify(v)); }catch{}};
-  const toB64=buf=>{const u=new Uint8Array(buf);let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s);};
-  const fromB64=b=>{const s=atob(b);const u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u.buffer;};
-  const stamp=()=>{const d=new Date(),p=n=>(''+n).padStart(2,'0');return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;};
-  const sub=net=>'TepDaPhanTich/'+net;
-
-  function getRemote(){
-    if(served) return {url:location.origin, pass:lsGet('ptcg_pass')||''};
-    const j=lsGet('ptcg_remote'); return j&&j.url?j:null;
-  }
-  function setRemote(cfg){ if(served) lsSet('ptcg_pass',cfg?cfg.pass:''); else lsSet('ptcg_remote',cfg); }
-  function normUrl(u){u=(''+(u||'')).trim().replace(/\/+$/,'');if(!u)return'';if(!/^https?:\/\//i.test(u))u='http://'+u;if(!/:\d+$/.test(u.replace(/^https?:\/\//i,'')))u+=':'+DEF_PORT;return u;}
-  async function api(cfg,path,opt){
-    opt=opt||{}; let res;
-    const h={'X-Pass':encodeURIComponent(cfg.pass||'')};
-    if(opt.json!==undefined) h['Content-Type']='application/json';
-    if(opt.raw!==undefined) h['Content-Type']='application/octet-stream';
-    try{ res=await fetch(cfg.url+path,{method:(opt.json!==undefined||opt.raw!==undefined)?'POST':'GET',cache:'no-store',headers:h,
-      body:opt.json!==undefined?JSON.stringify(opt.json):opt.raw}); }
-    catch(_){ const er=new Error('Không kết nối được máy chủ '+cfg.url.replace(/^https?:\/\//,'')+'. Kiểm tra máy chủ đã bật và cùng mạng LAN.'); er.code='net'; throw er; }
-    if(res.status===401){ const er=new Error('Sai mật khẩu máy chủ LAN.'); er.code=401; throw er; }
-    if(!res.ok){ let m=''; try{m=(await res.json()).error||'';}catch(_){} throw new Error('Máy chủ báo lỗi: '+(m||res.status)); }
-    return opt.bin ? res.arrayBuffer() : res.json();
-  }
-
-  function makeBackend(){
-    const rc=getRemote();
-    if(rc){
-      const q=(s,n)=>'?sub='+encodeURIComponent(s)+(n?'&name='+encodeURIComponent(n):'');
-      return { kind:'remote', cfg:rc,
-        kvLoad: async()=>{const j=await api(rc,'/api/kv');return {data:j.data||{},ver:''+j.ver};},
-        kvSet:  (k,v)=>api(rc,'/api/kv',{json:{key:k,value:v}}),
-        ver:    async()=>''+(await api(rc,'/api/ver')).ver,
-        list:   async s=>(await api(rc,'/api/files'+q(s))).files||[],
-        get:    (s,n)=>api(rc,'/api/file'+q(s,n),{bin:true}),
-        save:   async(s,n,buf)=>(await api(rc,'/api/file'+q(s,n),{raw:buf})).path };
-    }
-    if(N) return { kind:'electron',
-      kvLoad: async()=>{const j=await N.kvGet();return {data:j.data||{},ver:''+j.ver};},
-      kvSet:  (k,v)=>N.kvSet(k,v),
-      ver:    async()=>''+(await N.version()),
-      list:   s=>N.listFiles(s),
-      get:    async(s,n)=>{const b=await N.readFile(s,n);return b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);},
-      save:   (s,n,buf)=>N.saveFile(s,n,new Uint8Array(buf)) };
-    if(A) return { kind:'android',
-      kvLoad: async()=>{let d={};try{d=JSON.parse(A.kvRead()||'{}');}catch(_){}return {data:d,ver:null};},
-      kvSet:  async(k,v)=>{const d={...cache};if(v==null)delete d[k];else d[k]=v;const r=A.kvWrite(JSON.stringify(d));if(r!=='ok')throw new Error(r);},
-      ver:    null,
-      list:   async s=>{try{return JSON.parse(A.listFiles(s));}catch(_){return [];}},
-      get:    async(s,n)=>{const r=A.readFile(s,n);if(r.startsWith('ERR'))throw new Error(r.slice(4));return fromB64(r);},
-      save:   async(s,n,buf)=>{const r=A.saveFile(s,n,toB64(buf));if(r.startsWith('ERR'))throw new Error(r.slice(4));return r;} };
-    return { kind:'browser',
-      kvLoad: async()=>{const d={};SHARED.forEach(k=>{const v=lsGet(k);if(v!=null)d[k]=v;});return {data:d,ver:null};},
-      kvSet:  async(k,v)=>lsSet(k,v), ver:null, list:null, get:null, save:null };
-  }
-
-  /* ---------- dữ liệu dùng chung ---------- */
-  function get(k){ return k in cache ? JSON.parse(JSON.stringify(cache[k])) : null; }
-  async function set(k,v){
-    if(v==null) delete cache[k]; else cache[k]=JSON.parse(JSON.stringify(v));
-    try{ await B.kvSet(k,v); if(B.ver) ver=await B.ver(); }
-    catch(er){ alert('Chưa lưu được dữ liệu: '+(er.message||er)); }
-  }
-  async function refresh(){
-    if(!B) return;
-    try{ const d=await B.kvLoad(); cache=d.data; ver=d.ver; }
-    catch(er){ if(B.kind==='remote') alert(er.message); }
-  }
-
-  /* ---------- tệp đã phân tích ---------- */
-  const hasFiles=()=>!!(B&&B.list);
-  async function listFiles(net){ if(!hasFiles()) return []; try{ return await B.list(sub(net)); }catch(_){ return []; } }
-  async function getFile(net,name){ const buf=await B.get(sub(net),name); return new File([buf],name); }
-  async function saveUpload(net,file){
-    if(!hasFiles()) return '';
-    const list=await listFiles(net);
-    if(list.some(f=>f.name===file.name && f.size===file.size)) return '';
-    const name=list.some(f=>f.name===file.name) ? stamp()+'_'+file.name : file.name;
-    const p=await B.save(sub(net),name,await file.arrayBuffer());
-    return p;
-  }
-  async function fillSaved(net){
-    const sel=$('saved-'+net); if(!sel) return;
-    const grp=sel.closest('.filter-group'); if(grp) grp.classList.toggle('hidden',!hasFiles());
-    if(!hasFiles()||document.activeElement===sel) return;
-    const cur=sel.value, list=await listFiles(net);
-    sel.innerHTML='<option value="">-- Chọn tệp đã lưu --</option>'+list.map(f=>`<option value="${e(f.name)}">${e(f.name)}</option>`).join('');
-    if(list.some(f=>f.name===cur)) sel.value=cur;
-  }
-  const fillAll=()=>['viettel','mobi','vina'].forEach(n=>fillSaved(n));
-
-  /* ---------- xuất Excel ---------- */
-  function download(name,buf){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);}
-  function androidSaveAs(name,buf){return new Promise(r=>{window.__nativeSaved=m=>r(m||'');A.saveAs(name,toB64(buf));});}
-  async function exportBook(wb,baseName){
-    const name=baseName.replace(/\.xlsx$/i,'')+'_'+stamp()+'.xlsx';
-    if(!B||B.kind==='browser'){ XLSX.writeFile(wb,baseName); return 'Đã xuất file '+baseName; }
-    const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
-    if(B.kind==='remote'){
-      let srv=''; try{ srv=await B.save('KetQua',name,buf); }catch(_){}
-      if(A){ const m=await androidSaveAs(name,buf); return (m?'Đã lưu file '+m:'Đã huỷ lưu trên máy này')+(srv?'. Bản sao trên máy chủ: '+srv:''); }
-      download(name,buf); return 'Đã xuất file '+name+(srv?'. Bản sao trên máy chủ: '+srv:'');
-    }
-    const p=await B.save('KetQua',name,buf);
-    if(N) N.reveal(p).catch(()=>{});
-    return 'Đã lưu file kết quả: '+p;
-  }
-
-  /* ---------- giao diện: chọn thư mục, kết nối LAN ---------- */
-  function connectForm(box,intro){
-    const rc=getRemote()||{};
-    box.innerHTML=`<p class="kho-note">${intro}</p>
-      <div class="kho-row2">
-        <div${served?' class="hidden"':''}><label>Địa chỉ máy chủ</label><input class="cf-url" placeholder="VD: 10.71.5.20:${DEF_PORT}" value="${e((rc.url||'').replace(/^https?:\/\//,''))}" autocomplete="off"></div>
-        <div><label>Mật khẩu (nếu có)</label><input class="cf-pass" type="password" value="${e(rc.pass||'')}" autocomplete="off"></div>
-      </div>
-      <div class="modal-actions" style="justify-content:flex-start"><button class="btn btn-blue cf-go" type="button">Kết nối</button></div>
-      <div class="kho-msg cf-msg"></div>`;
-    const q=c=>box.querySelector(c);
-    q('.cf-go').onclick=async()=>{
-      const cfg={url:served?location.origin:normUrl(q('.cf-url').value),pass:q('.cf-pass').value};
-      if(!cfg.url){ q('.cf-msg').className='kho-msg err cf-msg'; q('.cf-msg').textContent='Hãy nhập địa chỉ máy chủ.'; return; }
-      q('.cf-go').disabled=true; q('.cf-msg').className='kho-msg cf-msg'; q('.cf-msg').textContent='Đang kết nối…';
-      try{
-        const info=await api(cfg,'/api/info'); if(!info||info.app!=='PhanTichCuocGoi') throw new Error('Địa chỉ này không phải máy chủ Phân tích Cuộc gọi.');
-        await api(cfg,'/api/ver'); setRemote(cfg); location.reload();
-      }catch(er){ q('.cf-msg').className='kho-msg err cf-msg'; q('.cf-msg').textContent=er.message||er; q('.cf-go').disabled=false; }
-    };
-  }
-  function lanAddr(st){
-    if(!st.running) return `<p class="kho-note">${st.error?'<span style="color:var(--red)">'+e(st.error)+'</span>':'Chia sẻ LAN đang tắt.'}</p>`;
-    return `<p class="kho-note">Máy khác nhập địa chỉ này vào nút <b>Mạng LAN</b>, hoặc mở trình duyệt gõ <b>http://</b>địa chỉ:</p>`+
-      ((st.addresses||[]).map(a=>`<div class="kho-path">${e(a)}:${st.port}</div>`).join('')||'<div class="kho-path">(không tìm thấy địa chỉ mạng)</div>');
-  }
-  function dot(){
-    const d=$('lanDot'); if(!d) return;
-    if(B&&B.kind==='remote'){ d.className='lan-dot on'; return; }
-    if(N&&N.lanStatus) N.lanStatus().then(s=>{d.className='lan-dot'+(s.running?' on':'');}).catch(()=>{});
-  }
-  async function openLan(errMsg){
-    const body=$('kho-lan-body'); $('kho-lan').classList.remove('hidden');
-    if(B&&B.kind==='remote'){
-      body.innerHTML=`<p class="kho-note">Đang dùng dữ liệu chung trên máy chủ:</p><div class="kho-path">${e(B.cfg.url.replace(/^https?:\/\//,''))}</div>
-        ${errMsg?`<div class="kho-msg err">${e(errMsg)}</div>`:''}
-        <div class="modal-actions" style="justify-content:flex-start"><button class="btn btn-blue" type="button" id="kho-retry">Thử kết nối lại</button>
-        ${served?'':'<button class="btn btn-red" type="button" id="kho-off">Ngắt kết nối, dùng dữ liệu máy này</button>'}</div>
-        <hr class="kho-sep"><div id="kho-cf"></div>`;
-      $('kho-retry').onclick=()=>location.reload();
-      if(!served) $('kho-off').onclick=()=>{ setRemote(null); location.reload(); };
-      connectForm($('kho-cf'), served?'Nhập mật khẩu máy chủ (nếu được yêu cầu):':'Hoặc đổi sang máy chủ khác:');
-      return;
-    }
-    let html='';
-    if(N&&N.lanStatus){
-      const st=await N.lanStatus();
-      html+=`<p class="kho-note">Bật để máy tính, điện thoại khác trong cùng mạng LAN dùng chung tài khoản, tệp đã phân tích và kết quả của máy này. Máy này cần mở app trong lúc máy khác làm việc.</p>
-        <label class="kho-chk"><input type="checkbox" id="kho-on" ${st.enabled?'checked':''}> Cho máy khác trong mạng LAN dùng chung</label>
-        <div class="kho-row2"><div><label>Cổng</label><input id="kho-port" inputmode="numeric" value="${e(st.port||DEF_PORT)}"></div>
-        <div><label>Mật khẩu truy cập</label><input id="kho-pass" placeholder="Để trống: không cần" value="${e(st.pass||'')}" autocomplete="off"></div></div>
-        <div class="modal-actions" style="justify-content:flex-start"><button class="btn btn-green" type="button" id="kho-save">Lưu cài đặt</button></div>
-        <div class="kho-msg" id="kho-lanmsg"></div><div id="kho-addr">${lanAddr(st)}</div><hr class="kho-sep">`;
-    }
-    html+='<div id="kho-cf"></div>'; body.innerHTML=html;
-    if(N&&N.lanStatus){
-      $('kho-save').onclick=async()=>{
-        const port=parseInt($('kho-port').value,10);
-        if(!(port>=1024&&port<=65535)){ $('kho-lanmsg').className='kho-msg err'; $('kho-lanmsg').textContent='Cổng phải từ 1024 đến 65535.'; return; }
-        const st=await N.lanSet({enabled:$('kho-on').checked,port,pass:$('kho-pass').value.trim()});
-        $('kho-lanmsg').className='kho-msg '+(st.error?'err':'ok'); $('kho-lanmsg').textContent=st.error||(st.running?'Đã bật chia sẻ.':'Đã tắt chia sẻ.');
-        $('kho-addr').innerHTML=lanAddr(st); dot();
-      };
-    }
-    connectForm($('kho-cf'), N?'Hoặc dùng dữ liệu của một máy chủ khác trong mạng LAN:':'Kết nối tới máy tính đang chạy Phân tích Cuộc gọi (exe) có bật chia sẻ LAN:');
-  }
-  function showSetup(st){
-    $('kho-setup').classList.remove('hidden');
-    let chosen=st.suggest||null;
-    $('kho-setup-path').textContent=chosen||'Chưa chọn thư mục.';
-    $('kho-setup-ok').disabled=!chosen;
-    $('kho-setup-note').textContent=st.platform==='android'
-      ?'Bấm Chọn thư mục, vào bộ nhớ máy (VD: Documents), tạo hoặc chọn thư mục PhanTich rồi bấm Sử dụng thư mục này. Khi đổi máy, copy cả thư mục này sang máy mới rồi chọn lại nó.'
-      :'App tạo thư mục PhanTich_DuLieu trong nơi bạn chọn. Khi chuyển máy, copy thư mục đó cùng file PhanTichCuocGoi.exe để chung một chỗ là chạy được.';
-    $('kho-setup-pick').onclick=async()=>{
-      const r=await (N?N.choose():new Promise(res=>{window.__nativeChosen=j=>res(j?JSON.parse(j):null);A.choose();}));
-      if(r&&r.folder){ chosen=r.folder; $('kho-setup-path').textContent=r.folder+(r.hasData?'  (đã có dữ liệu, sẽ dùng tiếp)':''); $('kho-setup-ok').disabled=false; }
-    };
-    $('kho-setup-ok').onclick=async()=>{
-      $('kho-setup-ok').disabled=true;
-      try{ const r=N?await N.confirm(chosen):JSON.parse(A.confirm()); if(r&&r.error) throw new Error(r.error);
-        $('kho-setup').classList.add('hidden'); await start(); }
-      catch(er){ $('kho-setup-msg').textContent='Không dùng được thư mục này: '+(er.message||er); $('kho-setup-ok').disabled=false; }
-    };
-    connectForm($('kho-setup-cf'),'<b>Hoặc</b> dùng chung dữ liệu với máy chủ trong mạng LAN (máy tính chạy Phân tích Cuộc gọi có bật chia sẻ):');
-  }
-  async function status(){ return N?N.status():JSON.parse(A.status()); }
-  async function start(){
-    if(B.kind==='electron'||B.kind==='android'){ const st=await status(); $('kho-folder').textContent=st.folder?'Dữ liệu: '+st.folder:''; }
-    await refresh(); fillAll(); dot();
-  }
-  async function init(){
-    B=makeBackend();
-    $('btnLan').classList.toggle('hidden',B.kind==='browser');
-    $('btnLan').onclick=()=>openLan();
-    $('kho-lan-close').onclick=()=>$('kho-lan').classList.add('hidden');
-    if(B.kind==='remote'){
-      $('kho-folder').textContent='Máy chủ LAN: '+B.cfg.url.replace(/^https?:\/\//,'');
-      try{ const d=await B.kvLoad(); cache=d.data; ver=d.ver; fillAll(); dot(); }
-      catch(er){ openLan(er.message); }
-    } else if(B.kind==='browser'){ await refresh(); }
-    else { const st=await status(); if(!st.configured){ showSetup(st); return; } await start(); }
-    setInterval(async()=>{
-      if(!B||!B.ver||document.hidden) return;
-      try{ const v=await B.ver(); if(v!==ver){ const d=await B.kvLoad(); cache=d.data; ver=d.ver; fillAll(); } if(B.kind==='remote') $('lanDot').className='lan-dot on'; }
-      catch(_){ if(B.kind==='remote') $('lanDot').className='lan-dot'; }
-    },5000);
-  }
-  return { SHARED, init, get, set, refresh, hasFiles, listFiles, getFile, saveUpload, fillSaved, exportBook };
-})();
-</script>
-<script>
-/* ================================================================
    AUTH (giữ nguyên). Admin mặc định: admin / minh79
    ================================================================ */
-const LS={
-  get:k=>{ if(KHO.SHARED.includes(k)) return KHO.get(k); try{return JSON.parse(localStorage.getItem(k));}catch{return null;} },
-  set:(k,v)=>{ if(KHO.SHARED.includes(k)) return KHO.set(k,v); localStorage.setItem(k,JSON.stringify(v)); },
-  del:k=>{ if(KHO.SHARED.includes(k)) return KHO.set(k,null); localStorage.removeItem(k); }
-};
+const LS={get:k=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},set:(k,v)=>localStorage.setItem(k,JSON.stringify(v)),del:k=>localStorage.removeItem(k)};
 const KEY_USERS='pa_users',KEY_SESS='pa_sess',KEY_ADMPASS='pa_adm_pass';
 const getAdmUser=()=>'admin', getAdmPass=()=>LS.get(KEY_ADMPASS)||'minh79';
 function openModal(n){document.getElementById('m-'+n).classList.remove('hidden');}
 function closeModal(n){document.getElementById('m-'+n).classList.add('hidden');}
-async function doRegister(){
-  await KHO.refresh();
+function doRegister(){
   const e=document.getElementById('reg-email').value.trim(),p=document.getElementById('reg-pass').value;
   if(!/^[^@]+@gmail\.com$/i.test(e))return alert('Email không hợp lệ (cần @gmail.com)');
   if(!(/[A-Z]/.test(p)&&/[a-z]/.test(p)&&/[0-9]/.test(p)&&p.length>=8))return alert('Mật khẩu yếu — cần ≥8 ký tự, có hoa, thường và số');
   const u=LS.get(KEY_USERS)||[];if(u.some(x=>x.email===e))return alert('Email đã tồn tại');
-  u.push({email:e,password:p});await LS.set(KEY_USERS,u);alert('Đăng ký thành công!');closeModal('register');
+  u.push({email:e,password:p});LS.set(KEY_USERS,u);alert('Đăng ký thành công!');closeModal('register');
 }
-async function doLogin(){
-  await KHO.refresh();
+function doLogin(){
   const e=document.getElementById('login-email').value.trim(),p=document.getElementById('login-pass').value;
   if(!(LS.get(KEY_USERS)||[]).find(x=>x.email===e&&x.password===p))return alert('Sai tài khoản hoặc mật khẩu');
   LS.set(KEY_SESS,{role:'user',email:e});closeModal('login');enterMain('user');
 }
-async function doAdminLogin(){
-  await KHO.refresh();
+function doAdminLogin(){
   const u=document.getElementById('adm-user').value.trim(),p=document.getElementById('adm-pass').value;
   if(u!==getAdmUser()||p!==getAdmPass())return alert('Sai tên đăng nhập hoặc mật khẩu Admin!');
   closeModal('admin');openModal('adminmenu');
 }
-async function doChangePass(){
-  await KHO.refresh();
+function doChangePass(){
   const o=document.getElementById('cp-old').value,n1=document.getElementById('cp-new1').value,n2=document.getElementById('cp-new2').value;
   if(o!==getAdmPass())return alert('Sai mật khẩu hiện tại');
   if(n1!==n2)return alert('Xác nhận mật khẩu không khớp');
   if(n1.length<6)return alert('Mật khẩu mới quá ngắn (≥6 ký tự)');
-  await LS.set(KEY_ADMPASS,n1);alert('Đã đổi mật khẩu!');closeModal('chpass');
+  LS.set(KEY_ADMPASS,n1);alert('Đã đổi mật khẩu!');closeModal('chpass');
 }
 function doLogout(){
   if(!confirm('Đăng xuất?'))return;LS.del(KEY_SESS);
@@ -498,14 +204,13 @@ function enterMain(role){
   const s=LS.get(KEY_SESS);
   document.getElementById('hdrUser').textContent=role==='admin'?'🛡 Admin':(s&&s.email?s.email:'');
 }
-async function openManage(){
-  await KHO.refresh();
+function openManage(){
   closeModal('adminmenu');
   const u=LS.get(KEY_USERS)||[],div=document.getElementById('accList');
   div.innerHTML=u.length?u.map((x,i)=>`<div class="acc-item"><b>${x.email}</b><button class="btn btn-red btn-sm" onclick="deleteUser(${i})">Xóa</button></div>`).join(''):'<div style="color:#6b7280;font-size:13px">Chưa có tài khoản người dùng.</div>';
   openModal('manage');
 }
-async function deleteUser(i){if(!confirm('Xóa tài khoản này?'))return;await KHO.refresh();const u=LS.get(KEY_USERS)||[];u.splice(i,1);await LS.set(KEY_USERS,u);openManage();}
+function deleteUser(i){if(!confirm('Xóa tài khoản này?'))return;const u=LS.get(KEY_USERS)||[];u.splice(i,1);LS.set(KEY_USERS,u);openManage();}
 (function(){const s=LS.get(KEY_SESS);if(s)enterMain(s.role);})();
 function switchTab(name,btn){
   ['viettel','mobi','vina'].forEach(n=>document.getElementById('tab-'+n).classList.toggle('hidden',n!==name));
@@ -734,7 +439,6 @@ function renderNetPanel(net){
   document.getElementById('tab-'+net).innerHTML=`
     <div class="filter-row">
       <div class="filter-group"><label>File Excel / CSV</label><input type="file" id="file-${net}" accept="${cfg.accept}"></div>
-      <div class="filter-group hidden"><label>Hoặc tệp đã lưu</label><select id="saved-${net}" style="min-width:200px"><option value="">-- Chọn tệp đã lưu --</option></select></div>
       <div class="filter-group"><label>Từ ngày (dd/mm/yyyy)</label>
         <div class="date-wrap">
           <input type="text" class="date-text" id="start-${net}" placeholder="dd/mm/yyyy" maxlength="10" oninput="toggleClear('start-${net}')">
@@ -779,8 +483,7 @@ function renderNetPanel(net){
     document.getElementById(id).addEventListener('change',()=>{ if(STATE[net].RAW) applyFilter(net); });
   });
   document.getElementById('phone-'+net).addEventListener('input',()=>{ if(STATE[net].RAW) applyFilter(net); });
-  document.getElementById('file-'+net).addEventListener('change',()=>{ STATE[net].RAW=null; STATE[net].LAST_RESULT=null; document.getElementById('saved-'+net).value=''; });
-  document.getElementById('saved-'+net).addEventListener('change',()=>{ STATE[net].RAW=null; STATE[net].LAST_RESULT=null; document.getElementById('file-'+net).value=''; });
+  document.getElementById('file-'+net).addEventListener('change',()=>{ STATE[net].RAW=null; STATE[net].LAST_RESULT=null; });
 }
 renderNetPanel('mobi');
 renderNetPanel('vina');
@@ -824,20 +527,13 @@ function findHeaderRow(matrix, cfg){
 }
 
 /* ---- Nạp file + chuẩn bị RAW + dropdown IMEI ---- */
-async function loadFile(net, onDone){
+function loadFile(net, onDone){
   const cfg=NETS[net], S=STATE[net];
   const fileEl=document.getElementById('file-'+net);
-  const savedEl=document.getElementById('saved-'+net);
-  if(!fileEl.files[0] && !savedEl.value){ alert('Vui lòng chọn file Excel hoặc CSV!'); return; }
+  if(!fileEl.files[0]){ alert('Vui lòng chọn file Excel hoặc CSV!'); return; }
   setStatus(net,'status-idle','⏳ Đang đọc file...');
   setProgress(net,0,'Đang đọc file...');
-  let srcFile=fileEl.files[0];
-  const fromLocal=!!srcFile;
-  if(!srcFile){
-    try{ srcFile=await KHO.getFile(net, savedEl.value); }
-    catch(er){ hideProgress(net); setStatus(net,'status-err','❌ Không mở được tệp đã lưu: '+(er.message||er)); return; }
-  }
-  readFile(srcFile, cfg.rawRead, (matrix,err)=>{
+  readFile(fileEl.files[0], cfg.rawRead, (matrix,err)=>{
     if(err){ hideProgress(net); setStatus(net,'status-err','❌ '+err); return; }
     if(!matrix||!matrix.length){ hideProgress(net); setStatus(net,'status-err','⚠️ File không có dữ liệu.'); return; }
     const {headerIdx,headers}=findHeaderRow(matrix,cfg);
@@ -867,9 +563,6 @@ async function loadFile(net, onDone){
     hideProgress(net);
     setStatus(net,'status-ok',`✅ Đã đọc ${rows.length.toLocaleString()} dòng dữ liệu (header ở dòng ${headerIdx+1}).`);
     if(onDone) onDone();
-    if(fromLocal && KHO.hasFiles()){
-      KHO.saveUpload(net, srcFile).then(p=>{ if(p) KHO.fillSaved(net); }).catch(er=>console.warn('Không lưu được bản sao tệp:',er));
-    }
   });
 }
 
@@ -905,7 +598,7 @@ function onImeiToggle(net,cb){
    ================================================================ */
 function runAnalyze(net){
   const fileEl=document.getElementById('file-'+net);
-  if(!fileEl.files[0] && !document.getElementById('saved-'+net).value){ alert('Vui lòng chọn file Excel hoặc CSV!'); return; }
+  if(!fileEl.files[0]){ alert('Vui lòng chọn file Excel hoặc CSV!'); return; }
   loadFile(net,()=>applyFilter(net));
 }
 
@@ -1072,20 +765,19 @@ function renderTable(net,headers,rows){
 /* ================================================================
    XUẤT EXCEL / XÓA
    ================================================================ */
-async function exportExcel(net){
+function exportExcel(net){
   const S=STATE[net];
   if(!S.LAST_RESULT || !S.LAST_RESULT.rows.length) return alert('Chưa có kết quả để xuất!');
   const aoa=[S.LAST_RESULT.headers, ...S.LAST_RESULT.rows];
   const ws=XLSX.utils.aoa_to_sheet(aoa);
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,NETS[net].label);
-  try{ const msg=await KHO.exportBook(wb,net+'_ketqua.xlsx'); setStatus(net,'status-ok','✅ '+msg); }
-  catch(er){ alert('Chưa xuất được file: '+(er.message||er)); }
+  XLSX.writeFile(wb,net+'_ketqua.xlsx');
 }
 function clearAll(net){
   const S=STATE[net];
   S.RAW=null; S.LAST_RESULT=null; S.SELECTED_IMEI.clear();
-  ['file','saved','start','end','phone','mode','imei'].forEach(p=>{ const el=document.getElementById(p+'-'+net); if(el) el.value=''; });
+  ['file','start','end','phone','mode','imei'].forEach(p=>{ const el=document.getElementById(p+'-'+net); if(el) el.value=''; });
   // xóa ô lịch ẩn + ẩn nút ✕
   ['start','end'].forEach(p=>{
     const pick=document.getElementById(p+'pick-'+net); if(pick) pick.value='';
@@ -1101,8 +793,340 @@ function clearAll(net){
 function setProgress(net,pct,txt){ const w=document.getElementById('prog-'+net); w.style.display='block'; document.getElementById('progfill-'+net).style.width=pct+'%'; document.getElementById('progtxt-'+net).textContent=txt; }
 function hideProgress(net){ document.getElementById('prog-'+net).style.display='none'; }
 function setStatus(net,cls,txt){ const el=document.getElementById('status-'+net); el.className='result-info '+cls; el.textContent=txt; }
+</script>
+<script>
+/* ================================================================
+   PHẦN THÊM: LƯU THƯ MỤC (exe/apk) + KẾT NỐI MẠNG LAN NỘI BỘ
+   Không sửa code cũ ở trên. Chỉ "bọc" thêm vài hàm có sẵn:
+   - Chạy trên XAMPP / trình duyệt thường: giữ nguyên như cũ (localStorage),
+     chỉ thêm nút "Mạng LAN" để kết nối máy chủ nếu muốn.
+   - exe/apk hoặc đã kết nối máy chủ LAN: tài khoản, mật khẩu admin,
+     tệp đã phân tích và kết quả xuất được lưu vào thư mục dữ liệu / máy chủ.
+   ================================================================ */
+(function(){
+  const N=window.NativeStore, A=window.AndroidStore;
+  const SHARED=['pa_users','pa_adm_pass'];
+  const NETS_LIST=['viettel','mobi','vina'];
+  const DEF_PORT=6868;
+  const $=id=>document.getElementById(id);
+  const e=s=>(''+(s==null?'':s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k));}catch(_){return null;}};
+  const lsSet=(k,v)=>{try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,JSON.stringify(v)); }catch(_){}};
+  const clone=v=>v==null?null:JSON.parse(JSON.stringify(v));
+  const toB64=buf=>{const u=new Uint8Array(buf);let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s);};
+  const fromB64=b=>{const s=atob(b);const u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u.buffer;};
+  const stamp=()=>{const d=new Date(),p=n=>(''+n).padStart(2,'0');return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;};
+  const sub=net=>'TepDaPhanTich/'+net;
 
-KHO.init();
+  let B=null, cache={}, ver=null, servedBy=false;
+  const active=()=>!!(B && B.kind!=='browser');
+
+  /* ---------- gọi máy chủ LAN ---------- */
+  function normUrl(u){u=(''+(u||'')).trim().replace(/\/+$/,'');if(!u)return'';if(!/^https?:\/\//i.test(u))u='http://'+u;if(!/:\d+$/.test(u.replace(/^https?:\/\//i,'')))u+=':'+DEF_PORT;return u;}
+  async function api(cfg,path,opt){
+    opt=opt||{}; let res;
+    const h={'X-Pass':encodeURIComponent(cfg.pass||'')};
+    if(opt.json!==undefined) h['Content-Type']='application/json';
+    if(opt.raw!==undefined) h['Content-Type']='application/octet-stream';
+    try{ res=await fetch(cfg.url+path,{method:(opt.json!==undefined||opt.raw!==undefined)?'POST':'GET',cache:'no-store',headers:h,
+      body:opt.json!==undefined?JSON.stringify(opt.json):opt.raw}); }
+    catch(_){ throw new Error('Không kết nối được máy chủ '+cfg.url.replace(/^https?:\/\//,'')+'. Kiểm tra máy chủ đã bật và cùng mạng LAN.'); }
+    if(res.status===401) throw new Error('Sai mật khẩu máy chủ LAN.');
+    if(!res.ok){ let m=''; try{m=(await res.json()).error||'';}catch(_){} throw new Error('Máy chủ báo lỗi: '+(m||res.status)); }
+    return opt.bin ? res.arrayBuffer() : res.json();
+  }
+  async function isOurServer(url){
+    try{ const r=await fetch(url+'/api/info',{cache:'no-store'}); if(!r.ok) return false; const j=await r.json(); return j && j.app==='PhanTichCuocGoi'; }
+    catch(_){ return false; }
+  }
+
+  /* ---------- các kiểu lưu trữ ---------- */
+  function remoteBackend(rc){
+    const q=(s,n)=>'?sub='+encodeURIComponent(s)+(n?'&name='+encodeURIComponent(n):'');
+    return { kind:'remote', cfg:rc,
+      kvLoad: async()=>{const j=await api(rc,'/api/kv');return {data:j.data||{},ver:''+j.ver};},
+      kvSet:  (k,v)=>api(rc,'/api/kv',{json:{key:k,value:v}}),
+      ver:    async()=>''+(await api(rc,'/api/ver')).ver,
+      list:   async s=>(await api(rc,'/api/files'+q(s))).files||[],
+      get:    (s,n)=>api(rc,'/api/file'+q(s,n),{bin:true}),
+      save:   async(s,n,buf)=>(await api(rc,'/api/file'+q(s,n),{raw:buf})).path };
+  }
+  function makeBackend(rc){
+    if(rc) return remoteBackend(rc);
+    if(N) return { kind:'electron',
+      kvLoad: async()=>{const j=await N.kvGet();return {data:j.data||{},ver:''+j.ver};},
+      kvSet:  (k,v)=>N.kvSet(k,v),
+      ver:    async()=>''+(await N.version()),
+      list:   s=>N.listFiles(s),
+      get:    async(s,n)=>{const b=await N.readFile(s,n);return b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);},
+      save:   (s,n,buf)=>N.saveFile(s,n,new Uint8Array(buf)) };
+    if(A) return { kind:'android',
+      kvLoad: async()=>{let d={};try{d=JSON.parse(A.kvRead()||'{}');}catch(_){}return {data:d,ver:null};},
+      kvSet:  async(k,v)=>{const d=clone(cache)||{};if(v==null)delete d[k];else d[k]=v;const r=A.kvWrite(JSON.stringify(d));if(r!=='ok')throw new Error(r);},
+      ver:    null,
+      list:   async s=>{try{return JSON.parse(A.listFiles(s));}catch(_){return [];}},
+      get:    async(s,n)=>{const r=A.readFile(s,n);if(r.startsWith('ERR'))throw new Error(r.slice(4));return fromB64(r);},
+      save:   async(s,n,buf)=>{const r=A.saveFile(s,n,toB64(buf));if(r.startsWith('ERR'))throw new Error(r.slice(4));return r;} };
+    return { kind:'browser' };
+  }
+  async function refresh(){
+    if(!active()) return;
+    try{ const old=ver, d=await B.kvLoad(); cache=d.data||{}; ver=d.ver; if(ver===null||ver!==old) fillAll(); }
+    catch(er){ if(B.kind==='remote') setDot(false); }
+  }
+  async function push(k,v){
+    if(v==null) delete cache[k]; else cache[k]=clone(v);
+    try{ await B.kvSet(k,v); }
+    catch(er){ alert('Chưa lưu được dữ liệu: '+(er.message||er)); }
+  }
+
+  /* ---------- bọc LS: tài khoản & mật khẩu admin dùng chung ---------- */
+  const _get=LS.get, _set=LS.set, _del=LS.del;
+  LS.get=k=>(active()&&SHARED.includes(k)) ? clone(cache[k]) : _get(k);
+  LS.set=(k,v)=>{ if(active()&&SHARED.includes(k)){ cache[k]=clone(v); push(k,v); } else _set(k,v); };
+  LS.del=k=>{ if(active()&&SHARED.includes(k)){ delete cache[k]; push(k,null); } else _del(k); };
+
+  /* bọc vài hàm để luôn đọc dữ liệu mới nhất trước khi đăng nhập / quản lý */
+  const _openModal=window.openModal;
+  window.openModal=function(n){ _openModal(n); if(active()) refresh(); };
+  const _openManage=window.openManage;
+  window.openManage=async function(){ if(active()) await refresh(); _openManage(); };
+  const _deleteUser=window.deleteUser;
+  window.deleteUser=async function(i){ if(active()) await refresh(); _deleteUser(i); };
+
+  /* ---------- tệp đã phân tích (dùng chung) ---------- */
+  const hasFiles=()=>!!(B&&B.list);
+  async function listFiles(net){ if(!hasFiles()) return []; try{ return await B.list(sub(net)); }catch(_){ return []; } }
+  async function saveUpload(net,file){
+    const list=await listFiles(net);
+    if(list.some(f=>f.name===file.name && f.size===file.size)) return '';
+    const name=list.some(f=>f.name===file.name) ? stamp()+'_'+file.name : file.name;
+    return B.save(sub(net),name,await file.arrayBuffer());
+  }
+  async function fillSaved(net){
+    const sel=$('saved-'+net); if(!sel) return;
+    sel.closest('.filter-group').classList.toggle('hidden',!hasFiles());
+    if(!hasFiles()||document.activeElement===sel) return;
+    const cur=sel.value, list=await listFiles(net);
+    sel.innerHTML='<option value="">-- Chọn tệp đã lưu --</option>'+list.map(f=>`<option value="${e(f.name)}">${e(f.name)}</option>`).join('');
+    if(list.some(f=>f.name===cur)) sel.value=cur;
+  }
+  const fillAll=()=>NETS_LIST.forEach(fillSaved);
+  async function checkNow(){
+    if(!B||!B.ver) { if(hasFiles()) fillAll(); return; }
+    try{ const v=await B.ver(); if(v!==ver){ const d=await B.kvLoad(); cache=d.data||{}; ver=d.ver; } fillAll(); }catch(_){}
+  }
+
+  NETS_LIST.forEach(net=>{
+    const fileEl=$('file-'+net); if(!fileEl) return;
+    fileEl.closest('.filter-group').insertAdjacentHTML('afterend',
+      `<div class="filter-group hidden"><label>Hoặc tệp đã lưu</label><select id="saved-${net}" style="min-width:200px"><option value="">-- Chọn tệp đã lưu --</option></select></div>`);
+    const sel=$('saved-'+net);
+    fileEl.addEventListener('change',()=>{ sel.value=''; });
+    sel.addEventListener('change',()=>{ fileEl.value=''; STATE[net].RAW=null; STATE[net].LAST_RESULT=null; });
+    const grp=sel.closest('.filter-group');
+    grp.addEventListener('mouseenter',()=>{ if(active()) checkNow(); });
+    grp.addEventListener('touchstart',()=>{ if(active()) checkNow(); },{passive:true});
+  });
+  const _switchTab=window.switchTab;
+  window.switchTab=function(name,btn){ _switchTab(name,btn); if(active()) checkNow(); };
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden && active()) checkNow(); });
+
+  /* bọc runAnalyze: nếu chọn tệp đã lưu thì nạp tệp đó vào ô chọn file rồi chạy hàm cũ */
+  const _runAnalyze=window.runAnalyze;
+  window.runAnalyze=async function(net){
+    const fileEl=$('file-'+net), sel=$('saved-'+net);
+    if(active() && hasFiles()){
+      if(!fileEl.files[0] && sel && sel.value){
+        try{
+          const buf=await B.get(sub(net),sel.value);
+          const dt=new DataTransfer(); dt.items.add(new File([buf],sel.value)); fileEl.files=dt.files;
+        }catch(er){ setStatus(net,'status-err','❌ Không mở được tệp đã lưu: '+(er.message||er)); return; }
+      } else if(fileEl.files[0] && !sel.value){
+        saveUpload(net,fileEl.files[0]).then(p=>{ if(p) fillSaved(net); }).catch(er=>console.warn('Không lưu được bản sao tệp:',er));
+      }
+    }
+    return _runAnalyze(net);
+  };
+  const _clearAll=window.clearAll;
+  window.clearAll=function(net){ _clearAll(net); const sel=$('saved-'+net); if(sel) sel.value=''; };
+
+  /* ---------- bọc XLSX.writeFile: lưu kết quả vào thư mục / máy chủ ---------- */
+  const _writeFile=XLSX.writeFile;
+  function download(name,buf){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);}
+  function androidSaveAs(name,buf){return new Promise(r=>{window.__nativeSaved=m=>r(m||'');A.saveAs(name,toB64(buf));});}
+  XLSX.writeFile=function(wb,filename,opts){
+    if(!active()) return _writeFile.apply(this,arguments);
+    const net=NETS_LIST.find(n=>(''+filename).startsWith(n+'_'));
+    const say=(cls,msg)=>{ if(net) setStatus(net,cls,msg); else alert(msg); };
+    const name=(''+filename).replace(/\.xlsx$/i,'')+'_'+stamp()+'.xlsx';
+    const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+    (async()=>{
+      if(B.kind==='remote'){
+        let srv=''; try{ srv=await B.save('KetQua',name,buf); }catch(_){}
+        if(A){ const m=await androidSaveAs(name,buf); return (m?'Đã lưu file '+m:'Đã huỷ lưu trên máy này')+(srv?'. Bản sao trên máy chủ: '+srv:''); }
+        download(name,buf); return 'Đã xuất file '+name+(srv?'. Bản sao trên máy chủ: '+srv:'');
+      }
+      const p=await B.save('KetQua',name,buf);
+      if(N) N.reveal(p).catch(()=>{});
+      return 'Đã lưu file kết quả: '+p;
+    })().then(m=>say('status-ok','✅ '+m)).catch(er=>say('status-err','❌ Chưa xuất được file: '+(er.message||er)));
+  };
+
+  /* ---------- giao diện thêm: nút Mạng LAN, chọn thư mục, kết nối ---------- */
+  document.head.insertAdjacentHTML('beforeend',`<style>
+    .kho-folder{font-size:12px;opacity:.85;max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .lan-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.45);margin-right:5px;vertical-align:middle;}
+    .lan-dot.on{background:#4ade80;}
+    .kho-note{font-size:12.5px;color:var(--muted);margin:4px 0;line-height:1.45;}
+    .kho-path{font-family:Consolas,monospace;font-size:12.5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;word-break:break-all;margin:6px 0;user-select:all;}
+    .kho-sep{border:0;border-top:1px solid var(--border);margin:12px 0 6px;}
+    .kho-msg{font-size:12.5px;margin-top:6px;} .kho-msg.err{color:var(--red);} .kho-msg.ok{color:var(--green);}
+    .kho-row2{display:grid;grid-template-columns:1.4fr 1fr;gap:8px;}
+    .modal label.kho-chk{display:flex;align-items:center;gap:8px;color:var(--text);font-size:13px;font-weight:600;}
+    .modal label.kho-chk input{width:auto;}
+    .kho-modal{width:480px;max-width:calc(100vw - 24px);max-height:calc(100vh - 24px);overflow:auto;}
+    @media (max-width:520px){.kho-row2{grid-template-columns:1fr;} header{flex-wrap:wrap;gap:6px;}}
+  </style>`);
+  const hdr=document.querySelector('header > div');
+  hdr.insertAdjacentHTML('afterbegin',`<span id="kho-folder" class="kho-folder"></span><button id="btnLan" class="btn-hdr" type="button"><span id="lanDot" class="lan-dot"></span>Mạng LAN</button>`);
+  document.body.insertAdjacentHTML('beforeend',`
+<div id="kho-setup" class="overlay hidden"><div class="modal kho-modal">
+  <h3>Chọn nơi lưu dữ liệu</h3>
+  <p class="kho-note">Tài khoản, các tệp đã phân tích và file kết quả xuất ra đều lưu trong thư mục này.</p>
+  <div class="kho-path" id="kho-setup-path">Chưa chọn thư mục.</div>
+  <p class="kho-note" id="kho-setup-note"></p>
+  <div class="modal-actions" style="justify-content:flex-start">
+    <button class="btn btn-ghost" type="button" id="kho-setup-pick">Chọn thư mục…</button>
+    <button class="btn btn-blue" type="button" id="kho-setup-ok" disabled>OK</button>
+  </div>
+  <div class="kho-msg err" id="kho-setup-msg"></div>
+  <hr class="kho-sep"><div id="kho-setup-cf"></div>
+</div></div>
+<div id="kho-lan" class="overlay hidden"><div class="modal kho-modal">
+  <h3>🖧 Mạng LAN nội bộ</h3>
+  <div id="kho-lan-body"></div>
+  <div class="modal-actions"><button class="btn btn-ghost" type="button" id="kho-lan-close">Đóng</button></div>
+</div></div>`);
+
+  function setDot(on){ const d=$('lanDot'); if(d) d.className='lan-dot'+(on?' on':''); }
+  function dot(){
+    if(B&&B.kind==='remote'){ setDot(true); return; }
+    if(N&&N.lanStatus) N.lanStatus().then(s=>setDot(s.running)).catch(()=>{}); else setDot(false);
+  }
+  function connectForm(box,intro){
+    const rc=lsGet('ptcg_remote')||(servedBy?{url:location.origin,pass:lsGet('ptcg_pass')||''}:{});
+    box.innerHTML=`<p class="kho-note">${intro}</p>
+      <div class="kho-row2">
+        <div${servedBy?' class="hidden"':''}><label>Địa chỉ máy chủ</label><input class="cf-url" placeholder="VD: 10.71.5.20:${DEF_PORT}" value="${e((rc.url||'').replace(/^https?:\/\//,''))}" autocomplete="off"></div>
+        <div><label>Mật khẩu (nếu có)</label><input class="cf-pass" type="password" value="${e(rc.pass||'')}" autocomplete="off"></div>
+      </div>
+      <div class="modal-actions" style="justify-content:flex-start"><button class="btn btn-blue cf-go" type="button">Kết nối</button></div>
+      <div class="kho-msg cf-msg"></div>`;
+    const q=c=>box.querySelector(c);
+    q('.cf-go').onclick=async()=>{
+      const cfg={url:servedBy?location.origin:normUrl(q('.cf-url').value),pass:q('.cf-pass').value};
+      const msg=(cls,t)=>{ q('.cf-msg').className='kho-msg cf-msg '+cls; q('.cf-msg').textContent=t; };
+      if(!cfg.url){ msg('err','Hãy nhập địa chỉ máy chủ.'); return; }
+      q('.cf-go').disabled=true; msg('','Đang kết nối…');
+      try{
+        if(!(await isOurServer(cfg.url))) throw new Error('Không thấy máy chủ Phân tích Cuộc gọi ở địa chỉ này. Kiểm tra địa chỉ, cổng và máy chủ đã bật chia sẻ LAN.');
+        await api(cfg,'/api/ver');
+        if(servedBy) lsSet('ptcg_pass',cfg.pass); else lsSet('ptcg_remote',cfg);
+        location.reload();
+      }catch(er){ msg('err',er.message||er); q('.cf-go').disabled=false; }
+    };
+  }
+  function lanAddr(st){
+    if(!st.running) return `<p class="kho-note">${st.error?'<span style="color:var(--red)">'+e(st.error)+'</span>':'Chia sẻ LAN đang tắt.'}</p>`;
+    return `<p class="kho-note">Máy khác nhập địa chỉ này vào nút <b>Mạng LAN</b>, hoặc mở trình duyệt gõ <b>http://</b>địa chỉ:</p>`+
+      ((st.addresses||[]).map(a=>`<div class="kho-path">${e(a)}:${st.port}</div>`).join('')||'<div class="kho-path">(không tìm thấy địa chỉ mạng)</div>');
+  }
+  async function openLan(errMsg){
+    const body=$('kho-lan-body'); $('kho-lan').classList.remove('hidden');
+    if(B&&B.kind==='remote'){
+      body.innerHTML=`<p class="kho-note">Đang dùng dữ liệu chung trên máy chủ:</p><div class="kho-path">${e(B.cfg.url.replace(/^https?:\/\//,''))}</div>
+        ${errMsg?`<div class="kho-msg err">${e(errMsg)}</div>`:''}
+        <div class="modal-actions" style="justify-content:flex-start"><button class="btn btn-blue" type="button" id="kho-retry">Thử kết nối lại</button>
+        ${servedBy?'':'<button class="btn btn-red" type="button" id="kho-off">Ngắt kết nối, dùng dữ liệu máy này</button>'}</div>
+        <hr class="kho-sep"><div id="kho-cf"></div>`;
+      $('kho-retry').onclick=()=>location.reload();
+      if(!servedBy) $('kho-off').onclick=()=>{ lsSet('ptcg_remote',null); location.reload(); };
+      connectForm($('kho-cf'), servedBy?'Nhập mật khẩu máy chủ (nếu được yêu cầu):':'Hoặc đổi sang máy chủ khác:');
+      return;
+    }
+    let html='';
+    if(N&&N.lanStatus){
+      const st=await N.lanStatus();
+      html+=`<p class="kho-note">Bật để máy tính, điện thoại khác trong cùng mạng LAN dùng chung tài khoản, tệp đã phân tích và kết quả của máy này. Máy này cần mở app trong lúc máy khác làm việc.</p>
+        <label class="kho-chk"><input type="checkbox" id="kho-on" ${st.enabled?'checked':''}> Cho máy khác trong mạng LAN dùng chung</label>
+        <div class="kho-row2"><div><label>Cổng</label><input id="kho-port" inputmode="numeric" value="${e(st.port||DEF_PORT)}"></div>
+        <div><label>Mật khẩu truy cập</label><input id="kho-pass" placeholder="Để trống: không cần" value="${e(st.pass||'')}" autocomplete="off"></div></div>
+        <div class="modal-actions" style="justify-content:flex-start"><button class="btn btn-green" type="button" id="kho-save">Lưu cài đặt</button></div>
+        <div class="kho-msg" id="kho-lanmsg"></div><div id="kho-addr">${lanAddr(st)}</div><hr class="kho-sep">`;
+    }
+    html+='<div id="kho-cf"></div>'; body.innerHTML=html;
+    if(N&&N.lanStatus){
+      $('kho-save').onclick=async()=>{
+        const port=parseInt($('kho-port').value,10);
+        if(!(port>=1024&&port<=65535)){ $('kho-lanmsg').className='kho-msg err'; $('kho-lanmsg').textContent='Cổng phải từ 1024 đến 65535.'; return; }
+        const st=await N.lanSet({enabled:$('kho-on').checked,port,pass:$('kho-pass').value.trim()});
+        $('kho-lanmsg').className='kho-msg '+(st.error?'err':'ok'); $('kho-lanmsg').textContent=st.error||(st.running?'Đã bật chia sẻ.':'Đã tắt chia sẻ.');
+        $('kho-addr').innerHTML=lanAddr(st); dot();
+      };
+    }
+    connectForm($('kho-cf'), N?'Hoặc dùng dữ liệu của một máy chủ khác trong mạng LAN:'
+      :'Kết nối tới máy tính đang chạy PhanTichCuocGoi.exe có bật chia sẻ LAN để dùng chung tài khoản và tệp:');
+  }
+  $('btnLan').onclick=()=>openLan();
+  $('kho-lan-close').onclick=()=>$('kho-lan').classList.add('hidden');
+
+  function showSetup(st){
+    $('kho-setup').classList.remove('hidden');
+    let chosen=st.suggest||null;
+    $('kho-setup-path').textContent=chosen||'Chưa chọn thư mục.';
+    $('kho-setup-ok').disabled=!chosen;
+    $('kho-setup-note').textContent=st.platform==='android'
+      ?'Bấm Chọn thư mục, vào bộ nhớ máy (VD: Documents), tạo hoặc chọn thư mục PhanTich rồi bấm Sử dụng thư mục này. Khi đổi máy, copy cả thư mục này sang máy mới rồi chọn lại nó.'
+      :'App tạo thư mục PhanTich_DuLieu trong nơi bạn chọn. Khi chuyển máy, copy thư mục đó cùng file PhanTichCuocGoi.exe để chung một chỗ là chạy được.';
+    $('kho-setup-pick').onclick=async()=>{
+      const r=await (N?N.choose():new Promise(res=>{window.__nativeChosen=j=>res(j?JSON.parse(j):null);A.choose();}));
+      if(r&&r.folder){ chosen=r.folder; $('kho-setup-path').textContent=r.folder+(r.hasData?'  (đã có dữ liệu, sẽ dùng tiếp)':''); $('kho-setup-ok').disabled=false; }
+    };
+    $('kho-setup-ok').onclick=async()=>{
+      $('kho-setup-ok').disabled=true;
+      try{ const r=N?await N.confirm(chosen):JSON.parse(A.confirm()); if(r&&r.error) throw new Error(r.error);
+        $('kho-setup').classList.add('hidden'); await startLocal(); }
+      catch(er){ $('kho-setup-msg').textContent='Không dùng được thư mục này: '+(er.message||er); $('kho-setup-ok').disabled=false; }
+    };
+    connectForm($('kho-setup-cf'),'<b>Hoặc</b> dùng chung dữ liệu với máy chủ trong mạng LAN (máy tính chạy PhanTichCuocGoi.exe có bật chia sẻ):');
+  }
+  async function status(){ return N?N.status():JSON.parse(A.status()); }
+  async function startLocal(){
+    const st=await status(); $('kho-folder').textContent=st.folder?'Dữ liệu: '+st.folder:'';
+    await refresh(); fillAll(); dot();
+  }
+
+  (async function init(){
+    let rc=lsGet('ptcg_remote');
+    // trang mở từ chính máy chủ LAN (exe) bằng trình duyệt; XAMPP thì không phải
+    if(!rc && !N && !A && /^https?:$/.test(location.protocol) && await isOurServer(location.origin)){
+      servedBy=true; rc={url:location.origin, pass:lsGet('ptcg_pass')||''};
+    }
+    B=makeBackend(rc);
+    if(B.kind==='remote'){
+      $('kho-folder').textContent='Máy chủ LAN: '+B.cfg.url.replace(/^https?:\/\//,'');
+      try{ const d=await B.kvLoad(); cache=d.data||{}; ver=d.ver; fillAll(); setDot(true); }
+      catch(er){ setDot(false); openLan(er.message); }
+    } else if(B.kind==='browser'){ setDot(false); return; }
+    else { const st=await status(); if(!st.configured){ showSetup(st); return; } await startLocal(); }
+    setInterval(async()=>{
+      if(!B||!B.ver||document.hidden) return;
+      try{ const v=await B.ver(); if(v!==ver){ const d=await B.kvLoad(); cache=d.data||{}; ver=d.ver; fillAll(); } if(B.kind==='remote') setDot(true); }
+      catch(_){ if(B.kind==='remote') setDot(false); }
+    },4000);
+  })();
+})();
 </script>
 </body>
 </html>
