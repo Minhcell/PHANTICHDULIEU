@@ -952,10 +952,14 @@ function setStatus(net,cls,txt){ const el=document.getElementById('status-'+net)
   window.clearAll=function(net){ _clearAll(net); const sel=$('saved-'+net); if(sel) sel.value=''; };
 
   /* ---------- bọc XLSX.writeFile: lưu kết quả vào thư mục / máy chủ ---------- */
-  const _writeFile=XLSX.writeFile;
+  if(!window.XLSX){
+    // thư viện Excel không nạp được: báo rõ, phần mạng LAN vẫn chạy
+    setTimeout(()=>alert('Không nạp được thư viện Excel (xlsx.full.min.js). Chức năng đọc/xuất Excel sẽ không chạy. Hãy kiểm tra file xlsx.full.min.js nằm cùng thư mục với index.html.'),300);
+  }
+  const _writeFile=window.XLSX ? XLSX.writeFile : null;
   function download(name,buf){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);}
   function androidSaveAs(name,buf){return new Promise(r=>{window.__nativeSaved=m=>r(m||'');A.saveAs(name,toB64(buf));});}
-  XLSX.writeFile=function(wb,filename,opts){
+  if(window.XLSX) XLSX.writeFile=function(wb,filename,opts){
     if(!active()) return _writeFile.apply(this,arguments);
     const net=NETS_LIST.find(n=>(''+filename).startsWith(n+'_'));
     const say=(cls,msg)=>{ if(net) setStatus(net,cls,msg); else alert(msg); };
