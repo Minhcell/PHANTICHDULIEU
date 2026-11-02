@@ -1,7 +1,7 @@
 name: Build PhanTichCuocGoi (exe + apk)
 
 # Workflow tự tạo lại toàn bộ mã nguồn PC và Android,
-# trên GitHub chỉ cần có file này và thư mục web (index.html, xlsx.full.min.js).
+# trên GitHub chỉ cần có file này và web/index.html (+ web/xlsx.full.min.js; nếu thiếu hoặc hỏng sẽ tự lấy bản chính thức).
 
 on:
   push:
@@ -13,13 +13,28 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Kiểm tra thư mục web
+      - name: Kiểm tra thư mục web và thư viện Excel
         shell: bash
         run: |
-          for f in web/index.html web/xlsx.full.min.js; do
-            if [ ! -f "$f" ]; then echo "::error::Thiếu file $f trên GitHub. Hãy upload lại file này."; missing=1; fi
-          done
-          [ -z "$missing" ]
+          if [ ! -f web/index.html ]; then echo "::error::Thiếu file web/index.html trên GitHub."; exit 1; fi
+          mkdir -p web
+          cat > /tmp/xlsxcheck.js <<'EOF_CHK'
+          const fs=require('fs'),vm=require('vm');
+          const f=process.argv[2]; let ok=false;
+          try{ const code=fs.readFileSync(f,'utf8'); const ctx={console}; ctx.window=ctx; ctx.self=ctx; vm.createContext(ctx);
+            vm.runInContext(code,ctx); ok=!!(ctx.XLSX&&ctx.XLSX.read&&ctx.XLSX.utils);
+            console.log('xlsx.full.min.js: dung luong',code.length,'| XLSX',ctx.XLSX&&ctx.XLSX.version); }
+          catch(e){ console.log('xlsx.full.min.js loi:',e.message); }
+          process.exit(ok?0:1);
+          EOF_CHK
+          if node /tmp/xlsxcheck.js web/xlsx.full.min.js; then
+            echo "Thư viện Excel trên GitHub dùng được."
+          else
+            echo "::warning::web/xlsx.full.min.js trên GitHub bị thiếu hoặc hỏng, tự dùng bản SheetJS 0.18.5 chính thức."
+            (cd /tmp && npm pack xlsx@0.18.5 --silent && tar xzf xlsx-0.18.5.tgz)
+            cp /tmp/package/dist/xlsx.full.min.js web/xlsx.full.min.js
+            node /tmp/xlsxcheck.js web/xlsx.full.min.js
+          fi
       - name: Tạo mã nguồn PC
         shell: bash
         run: |
@@ -307,12 +322,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Kiểm tra thư mục web
+      - name: Kiểm tra thư mục web và thư viện Excel
         run: |
-          for f in web/index.html web/xlsx.full.min.js; do
-            if [ ! -f "$f" ]; then echo "::error::Thiếu file $f trên GitHub. Hãy upload lại file này."; missing=1; fi
-          done
-          [ -z "$missing" ]
+          if [ ! -f web/index.html ]; then echo "::error::Thiếu file web/index.html trên GitHub."; exit 1; fi
+          mkdir -p web
+          cat > /tmp/xlsxcheck.js <<'EOF_CHK'
+          const fs=require('fs'),vm=require('vm');
+          const f=process.argv[2]; let ok=false;
+          try{ const code=fs.readFileSync(f,'utf8'); const ctx={console}; ctx.window=ctx; ctx.self=ctx; vm.createContext(ctx);
+            vm.runInContext(code,ctx); ok=!!(ctx.XLSX&&ctx.XLSX.read&&ctx.XLSX.utils);
+            console.log('xlsx.full.min.js: dung luong',code.length,'| XLSX',ctx.XLSX&&ctx.XLSX.version); }
+          catch(e){ console.log('xlsx.full.min.js loi:',e.message); }
+          process.exit(ok?0:1);
+          EOF_CHK
+          if node /tmp/xlsxcheck.js web/xlsx.full.min.js; then
+            echo "Thư viện Excel trên GitHub dùng được."
+          else
+            echo "::warning::web/xlsx.full.min.js trên GitHub bị thiếu hoặc hỏng, tự dùng bản SheetJS 0.18.5 chính thức."
+            (cd /tmp && npm pack xlsx@0.18.5 --silent && tar xzf xlsx-0.18.5.tgz)
+            cp /tmp/package/dist/xlsx.full.min.js web/xlsx.full.min.js
+            node /tmp/xlsxcheck.js web/xlsx.full.min.js
+          fi
       - name: Tạo mã nguồn Android
         run: |
           rm -rf android
