@@ -146,6 +146,15 @@ jobs:
               return st.isFile() ? { name: n, size: st.size, time: st.mtimeMs } : null;
             }).filter(Boolean).sort((a, b) => b.time - a.time);
           }
+          function readTexts(sub, names) {
+            const out = {};
+            if (!dataDir) return out;
+            const dir = path.join(dataDir, safeSub(sub));
+            for (const n of (Array.isArray(names) ? names : []).slice(0, 2000)) {
+              try { out[n] = fs.readFileSync(path.join(dir, safeName(n)), "utf8"); } catch { out[n] = null; }
+            }
+            return out;
+          }
           function filePath(sub, name) {
             if (!dataDir) throw new Error("Chưa chọn thư mục dữ liệu");
             const p = path.join(dataDir, safeSub(sub), safeName(name));
@@ -195,6 +204,7 @@ jobs:
                 if (req.method === "GET" && p === "/api/kv") return send(res, 200, { ver, data: kho });
                 if (req.method === "POST" && p === "/api/kv") { const b = JSON.parse((await readBody(req, 5e6)).toString("utf8") || "{}"); return send(res, 200, kvSet(b.key, b.value)); }
                 if (req.method === "GET" && p === "/api/files") return send(res, 200, { files: listFiles(q("sub")) });
+                if (req.method === "POST" && p === "/api/readtexts") { const b = JSON.parse((await readBody(req, 5e6)).toString("utf8") || "{}"); return send(res, 200, { texts: readTexts(b.sub, b.names) }); }
                 if (req.method === "GET" && p === "/api/file") {
                   const fp = filePath(q("sub"), q("name"));
                   res.writeHead(200, { "Content-Type": "application/octet-stream", "Cache-Control": "no-store" });
@@ -254,6 +264,7 @@ jobs:
           ipcMain.handle("store:saveFile", (e, sub, name, data) => saveFile(sub, name, Buffer.from(data)));
           ipcMain.handle("store:listFiles", (e, sub) => listFiles(sub));
           ipcMain.handle("store:readFile", (e, sub, name) => fs.readFileSync(filePath(sub, name)));
+          ipcMain.handle("store:readTexts", (e, sub, names) => readTexts(sub, names));
           ipcMain.handle("store:reveal", (e, p) => { if (p) shell.showItemInFolder(p); return true; });
           ipcMain.handle("store:lanStatus", () => lanStatus());
           ipcMain.handle("store:lanSet", async (e, cfg) => {
@@ -295,6 +306,7 @@ jobs:
             saveFile: (sub, name, data) => ipcRenderer.invoke("store:saveFile", sub, name, data),
             listFiles: (sub) => ipcRenderer.invoke("store:listFiles", sub),
             readFile: (sub, name) => ipcRenderer.invoke("store:readFile", sub, name),
+            readTexts: (sub, names) => ipcRenderer.invoke("store:readTexts", sub, names),
             reveal: (p) => ipcRenderer.invoke("store:reveal", p),
             lanStatus: () => ipcRenderer.invoke("store:lanStatus"),
             lanSet: (cfg) => ipcRenderer.invoke("store:lanSet", cfg)
@@ -798,6 +810,29 @@ jobs:
                       } catch (Exception e) {
                           return "ERR: " + e.getMessage();
                       }
+                  }
+
+                  /** Đọc nhiều file chữ (chỉ mục .chimuc.json) trong 1 lần, chỉ liệt kê thư mục 1 lần cho nhanh. */
+                  @JavascriptInterface
+                  public String readTexts(String sub, String namesJson) {
+                      JSONObject out = new JSONObject();
+                      try {
+                          DocumentFile r = root();
+                          if (r == null || !okSub(sub)) return "{}";
+                          DocumentFile d = subDir(r, sub, false);
+                          if (d == null) return "{}";
+                          java.util.HashMap<String, DocumentFile> map = new java.util.HashMap<>();
+                          for (DocumentFile f : d.listFiles()) if (f.getName() != null) map.put(f.getName(), f);
+                          JSONArray names = new JSONArray(namesJson);
+                          for (int i = 0; i < names.length(); i++) {
+                              String n = names.getString(i);
+                              DocumentFile f = map.get(n);
+                              if (f == null) { out.put(n, JSONObject.NULL); continue; }
+                              try { out.put(n, new String(readBytes(f), StandardCharsets.UTF_8)); }
+                              catch (Exception ex) { out.put(n, JSONObject.NULL); }
+                          }
+                      } catch (Exception ignored) { }
+                      return out.toString();
                   }
 
                   @JavascriptInterface
