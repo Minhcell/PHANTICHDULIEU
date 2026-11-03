@@ -849,7 +849,29 @@ function setStatus(net,cls,txt){ const el=document.getElementById('status-'+net)
       ver:    async()=>''+(await api(rc,'/api/ver')).ver,
       list:   async s=>(await api(rc,'/api/files'+q(s))).files||[],
       get:    (s,n)=>api(rc,'/api/file'+q(s,n),{bin:true}),
-      save:   async(s,n,buf)=>(await api(rc,'/api/file'+q(s,n),{raw:buf})).path };
+      save:   async(s,n,buf)=>(await api(rc,'/api/file'+q(s,n),{raw:buf})).path,
+      readTexts: async(s,names)=>(await api(rc,'/api/readtexts',{json:{sub:s,names}})).texts||{} };
+  }
+  /* trình duyệt thường (XAMPP): file lưu trong IndexedDB của trình duyệt */
+  function idbBackend(){
+    if(!window.indexedDB) return null;
+    let dbp=null;
+    const db=()=>dbp||(dbp=new Promise((res,rej)=>{const r=indexedDB.open('ptcg_files',1);
+      r.onupgradeneeded=()=>{const d=r.result; d.createObjectStore('meta',{keyPath:'k'}); d.createObjectStore('data',{keyPath:'k'});};
+      r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);}));
+    const req=(store,mode,fn)=>db().then(d=>new Promise((res,rej)=>{const t=d.transaction(store,mode);const q=fn(t.objectStore(store));
+      t.oncomplete=()=>res(q&&q.result); t.onerror=()=>rej(t.error);}));
+    return { kind:'browser',
+      list: async s=>(await req('meta','readonly',st=>st.getAll())||[]).filter(m=>m.sub===s).map(m=>({name:m.name,size:m.size,time:m.time})),
+      get:  async(s,n)=>{const r=await req('data','readonly',st=>st.get(s+'/'+n)); if(!r) throw new Error('Không tìm thấy file '+n); return r.data;},
+      save: async(s,n,buf)=>{const k=s+'/'+n, size=buf.byteLength, time=Date.now();
+        await db().then(d=>new Promise((res,rej)=>{const t=d.transaction(['meta','data'],'readwrite');
+          t.objectStore('data').put({k,data:buf}); t.objectStore('meta').put({k,sub:s,name:n,size,time});
+          t.oncomplete=()=>res(); t.onerror=()=>rej(t.error);}));
+        return 'bộ nhớ trình duyệt';},
+      readTexts: async(s,names)=>{const out={}; const d=await db(); await new Promise((res,rej)=>{const t=d.transaction('data','readonly'),st=t.objectStore('data');
+        names.forEach(n=>{const r=st.get(s+'/'+n); r.onsuccess=()=>{out[n]=r.result?new TextDecoder().decode(r.result.data):null;};});
+        t.oncomplete=()=>res(); t.onerror=()=>rej(t.error);}); return out;} };
   }
   function makeBackend(rc){
     if(rc) return remoteBackend(rc);
@@ -859,19 +881,21 @@ function setStatus(net,cls,txt){ const el=document.getElementById('status-'+net)
       ver:    async()=>''+(await N.version()),
       list:   s=>N.listFiles(s),
       get:    async(s,n)=>{const b=await N.readFile(s,n);return b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);},
-      save:   (s,n,buf)=>N.saveFile(s,n,new Uint8Array(buf)) };
+      save:   (s,n,buf)=>N.saveFile(s,n,new Uint8Array(buf)),
+      readTexts: (s,names)=>N.readTexts(s,names) };
     if(A) return { kind:'android',
       kvLoad: async()=>{let d={};try{d=JSON.parse(A.kvRead()||'{}');}catch(_){}return {data:d,ver:null};},
       kvSet:  async(k,v)=>{const d=clone(cache)||{};if(v==null)delete d[k];else d[k]=v;const r=A.kvWrite(JSON.stringify(d));if(r!=='ok')throw new Error(r);},
       ver:    null,
       list:   async s=>{try{return JSON.parse(A.listFiles(s));}catch(_){return [];}},
       get:    async(s,n)=>{const r=A.readFile(s,n);if(r.startsWith('ERR'))throw new Error(r.slice(4));return fromB64(r);},
-      save:   async(s,n,buf)=>{const r=A.saveFile(s,n,toB64(buf));if(r.startsWith('ERR'))throw new Error(r.slice(4));return r;} };
-    return { kind:'browser' };
+      save:   async(s,n,buf)=>{const r=A.saveFile(s,n,toB64(buf));if(r.startsWith('ERR'))throw new Error(r.slice(4));return r;},
+      readTexts: async(s,names)=>{try{return JSON.parse(A.readTexts(s,JSON.stringify(names)));}catch(_){return {};}} };
+    return idbBackend() || { kind:'browser' };
   }
   async function refresh(){
     if(!active()) return;
-    try{ const old=ver, d=await B.kvLoad(); cache=d.data||{}; ver=d.ver; if(ver===null||ver!==old) fillAll(); }
+    try{ const old=ver, d=await B.kvLoad(); cache=d.data||{}; ver=d.ver; if(ver===null||ver!==old) invalidate(); }
     catch(er){ if(B.kind==='remote') setDot(false); }
   }
   async function push(k,v){
@@ -894,62 +918,355 @@ function setStatus(net,cls,txt){ const el=document.getElementById('status-'+net)
   const _deleteUser=window.deleteUser;
   window.deleteUser=async function(i){ if(active()) await refresh(); _deleteUser(i); };
 
-  /* ---------- tệp đã phân tích (dùng chung) ---------- */
+  /* ================================================================
+     SỐ CẦN XEM + LƯU FILE (thêm mới)
+     - Nút "💾 Lưu": lưu file đang chọn vào thư mục của nhà mạng
+       (TepDaPhanTich/viettel | mobi | vina), kèm 1 file chỉ mục .chimuc.json
+       để tìm nhanh trong hàng trăm file mà không phải đọc lại Excel.
+     - Ô "Số cần xem": tên file là số điện thoại -> chọn số để phân tích file đó.
+     - Không chọn số: nhập ngày / số điện thoại rồi Phân tích -> tìm trong tất cả
+       file đã lưu của nhà mạng đó, file nào có kết quả hiện ở ô Số cần xem.
+     Hàm phân tích cũ (loadFile, applyFilter, ...) giữ nguyên, chỉ được gọi lại.
+     ================================================================ */
+  const DATA_RE=/\.(xlsx|xls|csv)$/i, IDX_SUF='.chimuc.json', IDX_VER=1;
+  const P={}; NETS_LIST.forEach(n=>P[n]={files:null, sel:null, matches:null});
+  const MEM={}; NETS_LIST.forEach(n=>MEM[n]=new Map());   // chỉ mục đã nạp: name -> {key, ix}
   const hasFiles=()=>!!(B&&B.list);
-  async function listFiles(net){ if(!hasFiles()) return []; try{ return await B.list(sub(net)); }catch(_){ return []; } }
-  async function saveUpload(net,file){
-    const list=await listFiles(net);
-    if(list.some(f=>f.name===file.name && f.size===file.size)) return '';
-    const name=list.some(f=>f.name===file.name) ? stamp()+'_'+file.name : file.name;
-    return B.save(sub(net),name,await file.arrayBuffer());
+  const invalidate=()=>NETS_LIST.forEach(n=>{ P[n].files=null; });
+  const enc=o=>new TextEncoder().encode(JSON.stringify(o)).buffer;
+  const yieldUI=()=>new Promise(r=>setTimeout(r,0));
+
+  function phoneOf(name){
+    const base=name.replace(DATA_RE,'');
+    const runs=base.match(/\d{8,}/g);
+    return runs ? runs.sort((a,b)=>b.length-a.length)[0] : base;
   }
-  async function fillSaved(net){
-    const sel=$('saved-'+net); if(!sel) return;
-    sel.closest('.filter-group').classList.toggle('hidden',!hasFiles());
-    if(!hasFiles()||document.activeElement===sel) return;
-    const cur=sel.value, list=await listFiles(net);
-    sel.innerHTML='<option value="">-- Chọn tệp đã lưu --</option>'+list.map(f=>`<option value="${e(f.name)}">${e(f.name)}</option>`).join('');
-    if(list.some(f=>f.name===cur)) sel.value=cur;
+  async function getFiles(net,force){
+    if(!hasFiles()) return [];
+    if(P[net].files && !force) return P[net].files;
+    let all=[]; try{ all=await B.list(sub(net)); }catch(_){ return P[net].files||[]; }
+    const idx=new Set(all.filter(f=>f.name.endsWith(IDX_SUF)).map(f=>f.name.slice(0,-IDX_SUF.length)));
+    P[net].files=all.filter(f=>DATA_RE.test(f.name))
+      .map(f=>({name:f.name,size:f.size,time:f.time,phone:phoneOf(f.name),hasIdx:idx.has(f.name)}))
+      .sort((a,b)=>a.phone.localeCompare(b.phone)||b.time-a.time);
+    return P[net].files;
   }
-  const fillAll=()=>NETS_LIST.forEach(fillSaved);
-  async function checkNow(){
-    if(!B||!B.ver) { if(hasFiles()) fillAll(); return; }
-    try{ const v=await B.ver(); if(v!==ver){ const d=await B.kvLoad(); cache=d.data||{}; ver=d.ver; } fillAll(); }catch(_){}
+
+  /* ---------- chỉ mục 1 file: dùng đúng các hàm đọc file / tìm cột của code cũ ---------- */
+  function readMatrix(net,file){ return new Promise(res=>readFile(file,NETS[net].rawRead,(m,err)=>res(err?null:m))); }
+  async function buildIndex(net,file){
+    const cfg=NETS[net];
+    const matrix=await readMatrix(net,file);
+    if(!matrix) throw new Error('không đọc được file '+file.name);
+    const ix={v:IDX_VER,size:file.size,n:0,ph:[],tys:[],t:[],a:[],b:[],ty:[],tmin:-1,tmax:-1};
+    const {headerIdx,headers}=findHeaderRow(matrix,cfg);
+    if(headerIdx<0) return ix;
+    const C=cfg.detectCols(headers), cc=cfg.caller(C), ce=cfg.callee(C), tc=cfg.typeCol(C);
+    const pm=new Map(), tm=new Map();
+    const pid=s=>{let i=pm.get(s); if(i===undefined){i=ix.ph.length; ix.ph.push(s); pm.set(s,i);} return i;};
+    const tid=s=>{let i=tm.get(s); if(i===undefined){i=ix.tys.length; ix.tys.push(s); tm.set(s,i);} return i;};
+    let mn=Infinity, mx=-Infinity;
+    for(let i=headerIdx+1;i<matrix.length;i++){
+      const row=matrix[i]; if(!row) continue;
+      if(row.every(v=>v==null||(''+v).trim()==='')) continue;
+      const dt=cfg.rowDate(row,C);
+      const sec=(dt&&!isNaN(dt)) ? Math.floor(dt.getTime()/1000) : -1;
+      if(sec>=0){ if(sec<mn) mn=sec; if(sec>mx) mx=sec; }
+      ix.t.push(sec);
+      ix.a.push(pid(normPhone(row[cc])));
+      ix.b.push(pid(normPhone(row[ce])));
+      ix.ty.push(tid((''+(tc>=0?row[tc]:'')).toLowerCase()));
+    }
+    ix.n=ix.t.length; if(mn!==Infinity){ ix.tmin=mn; ix.tmax=mx; }
+    return ix;
   }
+  async function readIndexTexts(net,names){
+    if(B.readTexts) return B.readTexts(sub(net),names);
+    const out={};
+    for(const n of names){ try{ out[n]=new TextDecoder().decode(await B.get(sub(net),n)); }catch(_){ out[n]=null; } }
+    return out;
+  }
+  /* tạo chỉ mục cho 1 file đã lưu (có khoá để không tạo trùng khi vừa tìm vừa chạy nền) */
+  const BUILDING=new Map();
+  function buildStored(net,f){
+    const k=net+'/'+f.name+'|'+f.size+'|'+f.time;
+    if(BUILDING.has(k)) return BUILDING.get(k);
+    const pr=(async()=>{
+      const buf=await B.get(sub(net),f.name);
+      const ix=await buildIndex(net,new File([buf],f.name));
+      MEM[net].set(f.name,{key:f.size+'|'+f.time,ix});
+      try{ await B.save(sub(net),f.name+IDX_SUF,enc(ix)); f.hasIdx=true; }catch(_){}
+      return ix;
+    })().finally(()=>BUILDING.delete(k));
+    BUILDING.set(k,pr); return pr;
+  }
+  /* nạp chỉ mục của nhiều file: lấy từ bộ nhớ, đọc theo lô, file nào thiếu thì tạo 1 lần rồi lưu lại */
+  async function loadIndexes(net,files,prog){
+    const mem=MEM[net], out=new Map(), key=f=>f.size+'|'+f.time;
+    const need=[];
+    files.forEach(f=>{ const m=mem.get(f.name); if(m&&m.key===key(f)) out.set(f.name,m.ix); else need.push(f); });
+    const withIdx=need.filter(f=>f.hasIdx), rebuild=need.filter(f=>!f.hasIdx);
+    for(let i=0;i<withIdx.length;i+=20){
+      const chunk=withIdx.slice(i,i+20);
+      prog(out.size, files.length, 'Đang nạp chỉ mục…');
+      let texts={}; try{ texts=await readIndexTexts(net,chunk.map(f=>f.name+IDX_SUF)); }catch(_){}
+      chunk.forEach(f=>{
+        let ix=null; try{ ix=JSON.parse(texts[f.name+IDX_SUF]||'null'); }catch(_){}
+        if(ix && ix.v===IDX_VER && ix.size===f.size){ mem.set(f.name,{key:key(f),ix}); out.set(f.name,ix); }
+        else rebuild.push(f);
+      });
+    }
+    for(const f of rebuild){
+      prog(out.size, files.length, 'Đang tạo chỉ mục cho '+f.name+' (chỉ làm 1 lần)…');
+      await yieldUI();
+      try{ out.set(f.name, await buildStored(net,f)); }
+      catch(er){ console.warn('Bỏ qua file lỗi',f.name,er); }
+    }
+    return out;
+  }
+
+  /* ---------- điều kiện lọc: đọc giống hệt applyFilter của code cũ ---------- */
+  function readCond(net){
+    const startVal=$('start-'+net).value.trim(), endVal=$('end-'+net).value.trim();
+    const phone=($('phone-'+net).value||'').replace(/\D/g,'');
+    const mode=($('mode-'+net).value||'').toLowerCase().trim();
+    const sP=parseInputDate(startVal), eP=parseInputDate(endVal);
+    let s=null,en=null;
+    if(sP&&eP){ s=mkDate(sP,false); en=mkDate(eP,true); }
+    else if(sP){ s=mkDate(sP,false); en=mkDate(sP,true); }
+    else if(eP){ s=mkDate(eP,false); en=mkDate(eP,true); }
+    return { s:s?Math.floor(s.getTime()/1000):null, e:en?Math.floor(en.getTime()/1000):null, phone, mode, has:!!(s||phone||mode) };
+  }
+  function countMatches(ix,c){
+    if(!ix.n) return 0;
+    if(c.s!=null && (ix.tmax<0 || ix.tmax<c.s || ix.tmin>c.e)) return 0;
+    let ph=null, ty=null;
+    if(c.phone){ ph=ix.ph.map(p=>p.includes(c.phone)); if(!ph.some(Boolean)) return 0; }
+    if(c.mode){ ty=ix.tys.map(x=>x.includes(c.mode)); if(!ty.some(Boolean)) return 0; }
+    const T=ix.t, Aa=ix.a, Bb=ix.b, Ty=ix.ty; let n=0;
+    for(let i=0;i<ix.n;i++){
+      if(c.s!=null){ const x=T[i]; if(x<0||x<c.s||x>c.e) continue; }
+      if(ph && !ph[Aa[i]] && !ph[Bb[i]]) continue;
+      if(ty && !ty[Ty[i]]) continue;
+      n++;
+    }
+    return n;
+  }
+
+  /* ---------- giao diện ô Số cần xem + nút Lưu ---------- */
+  document.head.insertAdjacentHTML('beforeend',`<style>
+    .pick-box{position:relative;}
+    .pick-wrap{position:relative;display:flex;align-items:center;}
+    .pick-wrap input{padding-right:24px;min-width:170px;}
+    .pick-clr{position:absolute;right:6px;cursor:pointer;color:#999;font-size:13px;display:none;}
+    .pick-clr:hover{color:var(--red);}
+    .pick-info{font-weight:600;color:var(--green);margin-left:6px;}
+    .pick-info.many{color:var(--yellow);}
+    .pick-dd{position:absolute;top:100%;left:0;min-width:260px;max-width:90vw;background:#fff;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.15);max-height:300px;overflow-y:auto;z-index:60;display:none;}
+    .pick-dd.show{display:block;}
+    .pick-head{padding:6px 10px;font-size:11.5px;color:var(--muted);background:#f9fafb;border-bottom:1px solid var(--border);position:sticky;top:0;}
+    .pick-item{padding:6px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #f1f1f1;display:flex;gap:8px;align-items:baseline;}
+    .pick-item:hover,.pick-item.on{background:#eff6ff;}
+    .pick-item b{font-family:Consolas,monospace;font-size:13px;}
+    .pick-item span{color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+    .pick-item em{font-style:normal;color:var(--green);font-size:11.5px;white-space:nowrap;}
+    .pick-empty{padding:8px 10px;color:#999;font-size:12.5px;}
+    .pick-all{padding:7px 10px;font-size:12px;color:var(--blue);cursor:pointer;text-align:center;}
+  </style>`);
 
   NETS_LIST.forEach(net=>{
     const fileEl=$('file-'+net); if(!fileEl) return;
     fileEl.closest('.filter-group').insertAdjacentHTML('afterend',
-      `<div class="filter-group hidden"><label>Hoặc tệp đã lưu</label><select id="saved-${net}" style="min-width:200px"><option value="">-- Chọn tệp đã lưu --</option></select></div>`);
-    const sel=$('saved-'+net);
-    fileEl.addEventListener('change',()=>{ sel.value=''; });
-    sel.addEventListener('change',()=>{ fileEl.value=''; STATE[net].RAW=null; STATE[net].LAST_RESULT=null; });
-    const grp=sel.closest('.filter-group');
-    grp.addEventListener('mouseenter',()=>{ if(active()) checkNow(); });
-    grp.addEventListener('touchstart',()=>{ if(active()) checkNow(); },{passive:true});
-  });
-  const _switchTab=window.switchTab;
-  window.switchTab=function(name,btn){ _switchTab(name,btn); if(active()) checkNow(); };
-  document.addEventListener('visibilitychange',()=>{ if(!document.hidden && active()) checkNow(); });
+      `<div class="filter-group pick-box hidden" id="pickbox-${net}"><label>Số cần xem<span class="pick-info" id="pickinfo-${net}"></span></label>
+        <div class="pick-wrap"><input type="text" id="pick-${net}" placeholder="-- Tất cả số đã lưu --" autocomplete="off" inputmode="numeric"><span class="pick-clr" id="pickclr-${net}" title="Bỏ chọn số">✕</span></div>
+        <div class="pick-dd" id="pickdd-${net}"></div></div>`);
+    const runBtn=document.querySelector(`#tab-${net} .btn-row .btn-green`);
+    runBtn.insertAdjacentHTML('afterend',`<button class="btn btn-blue hidden" type="button" id="save-${net}" title="Lưu file đang chọn vào thư mục ${NETS[net].label}">💾 Lưu</button>`);
 
-  /* bọc runAnalyze: nếu chọn tệp đã lưu thì nạp tệp đó vào ô chọn file rồi chạy hàm cũ */
+    const inp=$('pick-'+net), dd=$('pickdd-'+net);
+    inp.addEventListener('focus',()=>openDD(net,true));
+    inp.addEventListener('click',()=>openDD(net,false));
+    inp.addEventListener('input',()=>{ $('pickclr-'+net).style.display=inp.value?'block':'none'; renderDD(net); dd.classList.add('show'); });
+    inp.addEventListener('keydown',ev=>{
+      if(ev.key==='Escape'){ dd.classList.remove('show'); return; }
+      if(ev.key!=='Enter') return;
+      ev.preventDefault();
+      const q=inp.value.trim();
+      if(!q){ clearPick(net); return; }
+      const items=filtered(net);
+      const exact=items.filter(x=>x.file.phone===q.replace(/\D/g,'')||x.file.name===q);
+      const pick=exact.length===1?exact[0]:(items.length===1?items[0]:null);
+      if(pick) choose(net,pick.file); else { renderDD(net); dd.classList.add('show'); }
+    });
+    dd.addEventListener('mousedown',ev=>ev.preventDefault());
+    dd.addEventListener('click',ev=>{
+      if(ev.target.closest('.pick-all')){ P[net].matches=null; setInfo(net,''); $('pick-'+net).placeholder='-- Tất cả số đã lưu --'; renderDD(net); return; }
+      const it=ev.target.closest('.pick-item'); if(!it) return;
+      const f=(P[net].files||[]).find(x=>x.name===it.dataset.name); if(f) choose(net,f);
+    });
+    $('pickclr-'+net).addEventListener('click',()=>clearPick(net,true));
+    $('save-'+net).addEventListener('click',()=>saveCurrent(net));
+    // chọn file mới từ máy: bỏ chọn số (hàm cũ tự xoá dữ liệu đã đọc)
+    fileEl.addEventListener('change',()=>{ if(fileEl.files[0]){ P[net].sel=null; inp.value=''; $('pickclr-'+net).style.display='none'; } });
+  });
+  document.addEventListener('click',ev=>{
+    NETS_LIST.forEach(net=>{ const box=$('pickbox-'+net); if(box && !box.contains(ev.target)) $('pickdd-'+net).classList.remove('show'); });
+  });
+
+  function showPickUI(){
+    const on=hasFiles();
+    NETS_LIST.forEach(net=>{ $('pickbox-'+net).classList.toggle('hidden',!on); $('save-'+net).classList.toggle('hidden',!on); });
+  }
+  function setInfo(net,txt,many){ const el=$('pickinfo-'+net); el.textContent=txt?' · '+txt:''; el.className='pick-info'+(many?' many':''); }
+  function filtered(net){
+    const q=$('pick-'+net).value.trim().toLowerCase(), qd=q.replace(/\D/g,'');
+    const src=P[net].matches ? P[net].matches : (P[net].files||[]).map(f=>({file:f,count:0}));
+    if(!q || (P[net].sel && $('pick-'+net).value===P[net].sel.phone)) return src;
+    return src.filter(x=>(qd && x.file.phone.includes(qd)) || x.file.name.toLowerCase().includes(q));
+  }
+  function renderDD(net){
+    const dd=$('pickdd-'+net), files=P[net].files;
+    if(!files){ dd.innerHTML='<div class="pick-empty">Đang tải danh sách…</div>'; return; }
+    const list=filtered(net), M=P[net].matches, LIM=500;
+    let html=M ? `<div class="pick-head">${M.length} số có kết quả theo điều kiện đang nhập</div>`
+               : `<div class="pick-head">${files.length} file đã lưu (${NETS[net].label})</div>`;
+    if(!list.length) html+=`<div class="pick-empty">${files.length?'Không có số phù hợp.':'Chưa lưu file nào. Chọn file rồi nhấn 💾 Lưu.'}</div>`;
+    html+=list.slice(0,LIM).map(x=>{
+      const f=x.file, on=P[net].sel&&P[net].sel.name===f.name;
+      const showName=f.name.replace(DATA_RE,'')!==f.phone;
+      return `<div class="pick-item${on?' on':''}" data-name="${e(f.name)}"><b>${e(f.phone)}</b><span>${showName?e(f.name):''}</span>${x.count?`<em>${x.count.toLocaleString()} bản ghi</em>`:''}</div>`;
+    }).join('');
+    if(list.length>LIM) html+=`<div class="pick-empty">… còn ${list.length-LIM} số, gõ thêm để thu hẹp.</div>`;
+    if(M) html+='<div class="pick-all">Hiện tất cả số đã lưu</div>';
+    dd.innerHTML=html;
+  }
+  async function openDD(net,refreshList){
+    const dd=$('pickdd-'+net);
+    renderDD(net); dd.classList.add('show');
+    if(refreshList || !P[net].files){ await getFiles(net,true); renderDD(net); }
+  }
+  async function loadIntoInput(net,f){
+    const buf=await B.get(sub(net),f.name);
+    const dt=new DataTransfer(); dt.items.add(new File([buf],f.name)); $('file-'+net).files=dt.files;
+  }
+  async function choose(net,f){
+    const inp=$('pick-'+net);
+    P[net].sel=f; inp.value=f.phone; $('pickclr-'+net).style.display='block';
+    $('pickdd-'+net).classList.remove('show'); inp.blur();
+    STATE[net].RAW=null; STATE[net].LAST_RESULT=null;
+    setStatus(net,'status-idle','⏳ Đang mở file '+f.name+'…');
+    try{ await loadIntoInput(net,f); }
+    catch(er){ setStatus(net,'status-err','❌ Không mở được file '+f.name+': '+(er.message||er)); return; }
+    _runAnalyze(net);
+  }
+  function clearPick(net,clearResult){
+    P[net].sel=null; P[net].matches=null;
+    $('pick-'+net).value=''; $('pick-'+net).placeholder='-- Tất cả số đã lưu --'; $('pickclr-'+net).style.display='none'; setInfo(net,'');
+    if(clearResult){
+      $('file-'+net).value=''; STATE[net].RAW=null; STATE[net].LAST_RESULT=null;
+      $('result-'+net).innerHTML='';
+      setStatus(net,'status-idle','Đã bỏ chọn số. Nhập ngày / số điện thoại rồi nhấn Phân tích để tìm trong tất cả file đã lưu, hoặc chọn số cần xem.');
+    }
+  }
+
+  /* ---------- nút Lưu ---------- */
+  async function saveCurrent(net){
+    const fileEl=$('file-'+net), f=fileEl.files[0];
+    if(!f){ alert('Hãy chọn file Excel / CSV cần lưu.'); return; }
+    if(P[net].sel && P[net].sel.name===f.name){ setStatus(net,'status-ok','✅ File '+f.name+' đã có trong thư mục '+NETS[net].label+'.'); return; }
+    const btn=$('save-'+net); btn.disabled=true;
+    try{
+      const files=await getFiles(net,true);
+      const same=files.find(x=>x.name===f.name && x.size===f.size);
+      if(same){ P[net].sel=same; $('pick-'+net).value=same.phone; $('pickclr-'+net).style.display='block';
+        setStatus(net,'status-ok','✅ File '+f.name+' đã có trong thư mục '+NETS[net].label+', không lưu trùng.'); return; }
+      const name=files.some(x=>x.name===f.name) ? stamp()+'_'+f.name : f.name;
+      setProgress(net,30,'Đang lưu '+name+'…');
+      const buf=await f.arrayBuffer();
+      const path=await B.save(sub(net),name,buf);
+      setProgress(net,70,'Đang tạo chỉ mục tìm nhanh…');
+      try{ const ix=await buildIndex(net,new File([buf],name)); await B.save(sub(net),name+IDX_SUF,enc(ix)); }catch(_){}
+      hideProgress(net);
+      const nf=(await getFiles(net,true)).find(x=>x.name===name);
+      if(nf){ P[net].sel=nf; $('pick-'+net).value=nf.phone; $('pickclr-'+net).style.display='block'; }
+      P[net].matches=null; setInfo(net,'');
+      setStatus(net,'status-ok','✅ Đã lưu '+name+' vào thư mục '+NETS[net].label+(typeof path==='string'&&path?': '+path:'')+'.');
+    }catch(er){ hideProgress(net); setStatus(net,'status-err','❌ Chưa lưu được file: '+(er.message||er)); }
+    finally{ btn.disabled=false; }
+  }
+
+  /* ---------- tìm trong tất cả file đã lưu ---------- */
+  async function crossSearch(net){
+    const c=readCond(net);
+    const files=await getFiles(net,true);
+    if(!c.has){
+      setStatus(net,'status-idle',`📂 Có ${files.length} file ${NETS[net].label} đã lưu. Chọn "Số cần xem", hoặc nhập ngày / số điện thoại / loại cuộc gọi rồi nhấn Phân tích để tìm trong tất cả file.`);
+      $('pick-'+net).focus(); return;
+    }
+    const t0=performance.now();
+    setProgress(net,0,'Đang tìm trong '+files.length+' file…');
+    const idx=await loadIndexes(net,files,(d,tot,txt)=>setProgress(net,tot?Math.round(d*100/tot):0,txt+' ('+d+'/'+tot+')'));
+    setProgress(net,95,'Đang so khớp điều kiện…'); await yieldUI();
+    const matches=[];
+    for(const f of files){ const ix=idx.get(f.name); if(!ix) continue; const n=countMatches(ix,c); if(n) matches.push({file:f,count:n}); }
+    hideProgress(net);
+    const secs=((performance.now()-t0)/1000).toFixed(1);
+    if(!matches.length){
+      P[net].matches=null; setInfo(net,'không có số nào');
+      $('result-'+net).innerHTML='<div style="padding:14px;color:#999">Không có file nào khớp điều kiện lọc.</div>';
+      setStatus(net,'status-err',`Không có kết quả trong ${files.length} file đã lưu (${secs}s).`); return;
+    }
+    matches.sort((a,b)=>b.count-a.count);
+    P[net].matches=matches;
+    if(matches.length===1){
+      setInfo(net,'1 số có kết quả');
+      await choose(net,matches[0].file);
+      return;
+    }
+    setInfo(net,matches.length+' số có kết quả',true);
+    $('pick-'+net).value=''; $('pick-'+net).placeholder=`— Chọn 1 trong ${matches.length} số có kết quả —`; $('pickclr-'+net).style.display='block'; P[net].sel=null;
+    $('result-'+net).innerHTML='';
+    setStatus(net,'status-ok',`🔎 ${matches.length} số có kết quả (tổng ${matches.reduce((s,x)=>s+x.count,0).toLocaleString()} bản ghi, tìm trong ${files.length} file, ${secs}s). Nhấn ô "Số cần xem" để chọn số.`);
+    renderDD(net); $('pickdd-'+net).classList.add('show');
+  }
+
+  /* chạy nền: tạo sẵn chỉ mục cho file chưa có (VD file copy tay vào thư mục) để lần tìm đầu không phải chờ */
+  let bgRunning=false;
+  async function backgroundIndex(){
+    if(bgRunning||!hasFiles()) return; bgRunning=true;
+    try{
+      for(const net of NETS_LIST){
+        const files=await getFiles(net,true);
+        for(const f of files){
+          if(f.hasIdx) continue;
+          await new Promise(r=>(window.requestIdleCallback||setTimeout)(r,{timeout:300}));
+          try{ await buildStored(net,f); }catch(_){}
+        }
+      }
+    }finally{ bgRunning=false; }
+  }
+
+  /* bọc runAnalyze: có số đã chọn -> phân tích file đó; không chọn số và không chọn file -> tìm trong tất cả file */
   const _runAnalyze=window.runAnalyze;
   window.runAnalyze=async function(net){
-    const fileEl=$('file-'+net), sel=$('saved-'+net);
-    if(active() && hasFiles()){
-      if(!fileEl.files[0] && sel && sel.value){
-        try{
-          const buf=await B.get(sub(net),sel.value);
-          const dt=new DataTransfer(); dt.items.add(new File([buf],sel.value)); fileEl.files=dt.files;
-        }catch(er){ setStatus(net,'status-err','❌ Không mở được tệp đã lưu: '+(er.message||er)); return; }
-      } else if(fileEl.files[0] && !sel.value){
-        saveUpload(net,fileEl.files[0]).then(p=>{ if(p) fillSaved(net); }).catch(er=>console.warn('Không lưu được bản sao tệp:',er));
+    const fileEl=$('file-'+net);
+    if(!hasFiles()) return _runAnalyze(net);
+    const sel=P[net].sel;
+    if(sel){
+      if(!fileEl.files[0] || fileEl.files[0].name!==sel.name){
+        try{ await loadIntoInput(net,sel); }
+        catch(er){ setStatus(net,'status-err','❌ Không mở được file '+sel.name+': '+(er.message||er)); return; }
       }
+      return _runAnalyze(net);
     }
-    return _runAnalyze(net);
+    if(fileEl.files[0]) return _runAnalyze(net);                 // file mới chọn từ máy, chưa lưu
+    const files=await getFiles(net,true);
+    if(!files.length) return _runAnalyze(net);                   // chưa lưu file nào: báo như cũ
+    return crossSearch(net);
   };
   const _clearAll=window.clearAll;
-  window.clearAll=function(net){ _clearAll(net); const sel=$('saved-'+net); if(sel) sel.value=''; };
+  window.clearAll=function(net){ _clearAll(net); clearPick(net,false); };
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) invalidate(); });
 
   /* ---------- bọc XLSX.writeFile: lưu kết quả vào thư mục / máy chủ ---------- */
   if(!window.XLSX){
@@ -1108,7 +1425,7 @@ function setStatus(net,cls,txt){ const el=document.getElementById('status-'+net)
   async function status(){ return N?N.status():JSON.parse(A.status()); }
   async function startLocal(){
     const st=await status(); $('kho-folder').textContent=st.folder?'Dữ liệu: '+st.folder:'';
-    await refresh(); fillAll(); dot();
+    await refresh(); invalidate(); showPickUI(); dot(); setTimeout(backgroundIndex,1500);
   }
 
   (async function init(){
@@ -1117,16 +1434,16 @@ function setStatus(net,cls,txt){ const el=document.getElementById('status-'+net)
     if(!rc && !N && !A && /^https?:$/.test(location.protocol) && await isOurServer(location.origin)){
       servedBy=true; rc={url:location.origin, pass:lsGet('ptcg_pass')||''};
     }
-    B=makeBackend(rc);
+    B=makeBackend(rc); showPickUI();
     if(B.kind==='remote'){
       $('kho-folder').textContent='Máy chủ LAN: '+B.cfg.url.replace(/^https?:\/\//,'');
-      try{ const d=await B.kvLoad(); cache=d.data||{}; ver=d.ver; fillAll(); setDot(true); }
+      try{ const d=await B.kvLoad(); cache=d.data||{}; ver=d.ver; invalidate(); setDot(true); setTimeout(backgroundIndex,1500); }
       catch(er){ setDot(false); openLan(er.message); }
-    } else if(B.kind==='browser'){ setDot(false); return; }
+    } else if(B.kind==='browser'){ setDot(false); setTimeout(backgroundIndex,1500); return; }
     else { const st=await status(); if(!st.configured){ showSetup(st); return; } await startLocal(); }
     setInterval(async()=>{
       if(!B||!B.ver||document.hidden) return;
-      try{ const v=await B.ver(); if(v!==ver){ const d=await B.kvLoad(); cache=d.data||{}; ver=d.ver; fillAll(); } if(B.kind==='remote') setDot(true); }
+      try{ const v=await B.ver(); if(v!==ver){ const d=await B.kvLoad(); cache=d.data||{}; ver=d.ver; invalidate(); } if(B.kind==='remote') setDot(true); }
       catch(_){ if(B.kind==='remote') setDot(false); }
     },4000);
   })();
