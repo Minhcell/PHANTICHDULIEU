@@ -44,7 +44,7 @@ jobs:
             "name": "phantichcuocgoi",
             "productName": "PhanTichCuocGoi",
             "version": "1.0.0",
-            "description": "Phân tích Cuộc gọi / SMS (offline, mạng LAN)",
+            "description": "Phân tích dữ liệu (offline, mạng LAN)",
             "main": "main.js",
             "author": "Hi",
             "license": "UNLICENSED",
@@ -68,7 +68,7 @@ jobs:
           EOF_0
           mkdir -p "pc"
           cat > "pc/main.js" <<'EOF_1'
-          // Phân tích Cuộc gọi / SMS - bản PC (Electron, chạy offline, có thể làm máy chủ mạng LAN)
+          // Phân tích dữ liệu - bản PC (Electron, chạy offline, có thể làm máy chủ mạng LAN)
           const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require("electron");
           const path = require("path");
           const fs = require("fs");
@@ -293,7 +293,7 @@ jobs:
 
           function createWindow() {
             const win = new BrowserWindow({
-              width: 1360, height: 860, minWidth: 380, minHeight: 500, title: "Phân tích Cuộc gọi / SMS",
+              width: 1360, height: 860, minWidth: 380, minHeight: 500, title: "Phân tích dữ liệu",
               backgroundColor: "#f3f5f8", autoHideMenuBar: true,
               webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false, spellcheck: false }
             });
@@ -437,7 +437,7 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
               <application
-                  android:label="Phân tích CG"
+                  android:label="Phân tích dữ liệu"
                   android:icon="@mipmap/ic_launcher"
                   android:roundIcon="@mipmap/ic_launcher"
                   android:allowBackup="false"

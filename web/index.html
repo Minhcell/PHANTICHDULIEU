@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<title>Phân tích Cuộc gọi / SMS</title>
+<title>Phân tích dữ liệu</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 :root{
@@ -75,7 +75,7 @@ table.rtable tr:hover td{background:#eff6ff;}
 <body>
 
 <header>
-  <h1>📊 Phân tích Cuộc gọi / SMS</h1>
+  <h1>📊 Phân tích dữ liệu</h1>
   <div style="display:flex;align-items:center;gap:10px">
     <span id="hdrUser" style="font-size:13px;opacity:.8"></span>
     <button id="btnLogout" class="btn-hdr hidden" onclick="doLogout()">⬅ Thoát</button>
@@ -1074,7 +1074,7 @@ if(!window.XLSX){ var s=document.createElement('script'); s.textContent=document
       if(!cfg.url){ msg('err','Hãy nhập địa chỉ máy chủ.'); return; }
       q('.cf-go').disabled=true; msg('','Đang kết nối…');
       try{
-        if(!(await isOurServer(cfg.url))) throw new Error('Không thấy máy chủ Phân tích Cuộc gọi ở địa chỉ này. Kiểm tra địa chỉ, cổng và máy chủ đã bật chia sẻ LAN.');
+        if(!(await isOurServer(cfg.url))) throw new Error('Không thấy máy chủ Phân tích dữ liệu ở địa chỉ này. Kiểm tra địa chỉ, cổng và máy chủ đã bật chia sẻ LAN.');
         await api(cfg,'/api/ver');
         if(servedBy) lsSet('ptcg_pass',cfg.pass); else lsSet('ptcg_remote',cfg);
         location.reload();
@@ -1939,6 +1939,16 @@ if(!window.XLSX){ var s=document.createElement('script'); s.textContent=document
       }
     }
   });
+})();
+</script>
+<script>
+/* PHẦN THÊM: dòng bản quyền cuối trang */
+(function(){
+  document.head.insertAdjacentHTML('beforeend',`<style>
+    .ban-quyen{text-align:center;font-size:12px;color:var(--muted);padding:14px 10px calc(14px + env(safe-area-inset-bottom,0px));letter-spacing:.3px;}
+    .ban-quyen b{color:var(--text);font-weight:600;}
+  </style>`);
+  document.body.insertAdjacentHTML('beforeend','<footer class="ban-quyen">Copyright © by <b>TM-Đ1-06TPĐN</b></footer>');
 })();
 </script>
 </body>
