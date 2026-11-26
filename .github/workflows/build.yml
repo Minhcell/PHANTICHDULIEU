@@ -235,7 +235,15 @@ jobs:
               s.listen(lan.port, "0.0.0.0", () => { server = s; resolve(); });
             });
           }
-          async function applyLan() { await stopServer(); if (lan.enabled && dataDir) await startServer(); return lanStatus(); }
+          async function applyLan() {
+            await stopServer(); serverError = "";
+            if (lan.enabled && dataDir) {
+              // bắt buộc có mật khẩu để máy khác kết nối
+              if (!lan.pass || lan.pass.length < 4) serverError = "Cần đặt mật khẩu truy cập (ít nhất 4 ký tự) để bật chia sẻ LAN.";
+              else await startServer();
+            }
+            return lanStatus();
+          }
 
           /* ---------- cầu nối với giao diện ---------- */
           ipcMain.handle("store:status", () => ({ platform: "pc", configured: !!dataDir, folder: dataDir, suggest: path.join(exeDir, DATA_DIR_NAME) }));
@@ -833,6 +841,12 @@ jobs:
                           }
                       } catch (Exception ignored) { }
                       return out.toString();
+                  }
+
+                  /** Nút "Đóng app" trong giao diện. */
+                  @JavascriptInterface
+                  public void exit() {
+                      runOnUiThread(() -> finishAndRemoveTask());
                   }
 
                   @JavascriptInterface

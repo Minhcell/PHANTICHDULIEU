@@ -823,6 +823,18 @@ t:"b",v:false};else if(!isNaN(ue(_)))y={t:"n",v:ue(_)};else if(!isNaN(de(_).getD
 if(!window.XLSX){ var s=document.createElement('script'); s.textContent=document.getElementById('xlsx-duphong').textContent; document.head.appendChild(s); }
 </script>
 <script>
+/* PHẦN THÊM: mật khẩu máy chủ LAN phải nhập lại mỗi lần mở app (không lưu giữa các lần mở) */
+(function(){
+  try{
+    if(!sessionStorage.getItem('ptcg_ok')){
+      const r=JSON.parse(localStorage.getItem('ptcg_remote')||'null');
+      if(r && r.pass){ r.pass=''; localStorage.setItem('ptcg_remote',JSON.stringify(r)); }
+      localStorage.removeItem('ptcg_pass');
+    }
+  }catch(_){}
+})();
+</script>
+<script>
 /* ================================================================
    PHẦN THÊM: LƯU THƯ MỤC (exe/apk) + KẾT NỐI MẠNG LAN NỘI BỘ
    Không sửa code cũ ở trên. Chỉ "bọc" thêm vài hàm có sẵn:
@@ -1549,6 +1561,118 @@ if(!window.XLSX){ var s=document.createElement('script'); s.textContent=document
   }
   const A_SAVE=()=>!!window.AndroidStore;
 
+})();
+</script>
+<script>
+/* ================================================================
+   PHẦN THÊM: NÚT THOÁT LAN, NÚT ĐÓNG APP, BẮT BUỘC MẬT KHẨU KHI KẾT NỐI LAN
+   Không sửa code cũ: chỉ thêm nút và kiểm tra trước khi các nút cũ chạy.
+   ================================================================ */
+(function(){
+  const $=id=>document.getElementById(id);
+  const NS=window.NativeStore, AS=window.AndroidStore;
+  const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k));}catch(_){return null;}};
+  const ss=(k,v)=>{try{ if(v==null) sessionStorage.removeItem(k); else sessionStorage.setItem(k,v); }catch(_){}};
+  const MINPASS=4;
+
+  document.head.insertAdjacentHTML('beforeend',`<style>
+    .btn-hdr.lan-out{background:rgba(255,255,255,.15);}
+    .btn-hdr.app-quit{background:rgba(200,30,30,.55);border-color:rgba(255,255,255,.5);}
+    .btn-hdr.app-quit:hover{background:rgba(200,30,30,.8);}
+  </style>`);
+  const lanBtn=$('btnLan');
+  if(lanBtn) lanBtn.insertAdjacentHTML('afterend',
+    `<button id="btnLanOut" class="btn-hdr lan-out hidden" type="button" title="Thoát kết nối mạng LAN">🚪 Thoát LAN</button>`+
+    `<button id="btnQuit" class="btn-hdr app-quit hidden" type="button" title="Đóng ứng dụng">✖ Đóng app</button>`);
+
+  /* ---------- trạng thái: máy khách LAN / máy chủ đang chia sẻ ---------- */
+  const isClient=()=>{ const f=$('kho-folder'); return !!lsGet('ptcg_remote') || !!(f && f.textContent.startsWith('Máy chủ LAN')); };
+  const servedBy=()=>!lsGet('ptcg_remote') && /^https?:$/.test(location.protocol) && !NS && !AS;
+  let serverOn=false;
+  async function refreshButtons(){
+    if(NS && NS.lanStatus){ try{ serverOn=!!(await NS.lanStatus()).running; }catch(_){ serverOn=false; } }
+    const out=$('btnLanOut'); if(!out) return;
+    const client=isClient();
+    out.classList.toggle('hidden',!(client||serverOn));
+    out.textContent = client ? '🚪 Thoát LAN' : '🚪 Tắt chia sẻ LAN';
+    out.title = client ? 'Thoát kết nối máy chủ LAN' : 'Tắt chia sẻ, máy khác không kết nối được nữa';
+    $('btnQuit').classList.toggle('hidden',!(NS || (AS && AS.exit)));
+  }
+  setTimeout(refreshButtons,800); setInterval(refreshButtons,3000);
+  document.addEventListener('click',ev=>{ if(ev.target.closest('#kho-lan-close,#kho-save,#kho-setup-ok')) setTimeout(refreshButtons,500); });
+
+  $('btnLanOut').addEventListener('click',async()=>{
+    if(isClient()){
+      const sv=servedBy();
+      if(!confirm(sv ? 'Thoát kết nối máy chủ LAN? Lần sau phải nhập lại mật khẩu.' : 'Thoát kết nối máy chủ LAN và quay về dữ liệu của máy này?')) return;
+      try{ localStorage.removeItem('ptcg_remote'); localStorage.removeItem('ptcg_pass'); }catch(_){}
+      ss('ptcg_ok',null); location.reload(); return;
+    }
+    if(serverOn && NS && NS.lanSet){
+      if(!confirm('Tắt chia sẻ LAN? Các máy khác sẽ không kết nối được vào máy này nữa.')) return;
+      try{ const st=await NS.lanStatus(); await NS.lanSet({enabled:false,port:st.port,pass:st.pass}); }catch(er){ alert('Chưa tắt được: '+(er.message||er)); }
+      refreshButtons();
+    }
+  });
+  $('btnQuit').addEventListener('click',()=>{
+    if(!confirm('Đóng ứng dụng?')) return;
+    if(AS && AS.exit) AS.exit(); else window.close();
+  });
+
+  /* ---------- bắt buộc mật khẩu ---------- */
+  // máy khách: ô mật khẩu không được để trống; kết nối được thì nhớ trong lần mở app này
+  document.addEventListener('click',ev=>{
+    const go=ev.target.closest('.cf-go'); if(!go) return;
+    const box=go.closest('#kho-cf,#kho-setup-cf')||document;
+    const pass=box.querySelector('.cf-pass'), msg=box.querySelector('.cf-msg');
+    if(pass && !pass.value.trim()){
+      ev.stopImmediatePropagation(); ev.preventDefault();
+      if(msg){ msg.className='kho-msg err cf-msg'; msg.textContent='Hãy nhập mật khẩu máy chủ LAN.'; }
+      pass.focus(); return;
+    }
+    ss('ptcg_ok','1');
+  },true);
+  document.addEventListener('keydown',ev=>{
+    if(ev.key!=='Enter' || !ev.target.classList || !ev.target.classList.contains('cf-pass')) return;
+    const box=ev.target.closest('#kho-cf,#kho-setup-cf'); const go=box&&box.querySelector('.cf-go');
+    if(go){ ev.preventDefault(); go.click(); }
+  });
+  // máy chủ: bật chia sẻ thì phải đặt mật khẩu
+  document.addEventListener('click',ev=>{
+    if(!ev.target.closest('#kho-save')) return;
+    const on=$('kho-on'), pw=$('kho-pass'), msg=$('kho-lanmsg');
+    if(on && on.checked && pw && pw.value.trim().length<MINPASS){
+      ev.stopImmediatePropagation(); ev.preventDefault();
+      if(msg){ msg.className='kho-msg err'; msg.textContent=`Phải đặt mật khẩu truy cập (ít nhất ${MINPASS} ký tự) mới bật được chia sẻ LAN.`; }
+      pw.focus();
+    }
+  },true);
+
+  /* ---------- sửa chữ trên khung kết nối cho rõ ---------- */
+  function tidy(root){
+    if(!root) return;
+    root.querySelectorAll('.cf-pass').forEach(inp=>{
+      const lb=inp.previousElementSibling; if(lb && /nếu có/.test(lb.textContent)) lb.textContent='Mật khẩu máy chủ';
+      inp.placeholder='Nhập mật khẩu';
+    });
+    const pw=root.querySelector('#kho-pass');
+    if(pw){ pw.placeholder=`Bắt buộc, ít nhất ${MINPASS} ký tự`; pw.type='password';
+      const lb=pw.previousElementSibling; if(lb && lb.tagName==='LABEL' && !/bắt buộc/.test(lb.textContent)) lb.textContent='Mật khẩu truy cập (bắt buộc)'; }
+    // mở app chưa nhập mật khẩu: không coi là lỗi, chỉ mời nhập
+    const err=root.querySelector('.kho-msg.err');
+    let fresh=false; try{ fresh=!sessionStorage.getItem('ptcg_ok'); }catch(_){}
+    if(err && /Sai mật khẩu/.test(err.textContent) && fresh){
+      err.className='kho-msg'; err.textContent='🔒 Nhập mật khẩu máy chủ LAN để kết nối.';
+      const note=root.querySelector('#kho-cf .kho-note'); if(note) note.style.display='none';
+      const retry=root.querySelector('#kho-retry'); if(retry) retry.style.display='none';
+      const sep=root.querySelector('.kho-sep'); if(sep) sep.style.display='none';
+      const p=root.querySelector('#kho-cf .cf-pass'); if(p) setTimeout(()=>p.focus(),50);
+    }
+  }
+  ['kho-lan-body','kho-setup-cf'].forEach(id=>{
+    const el=$(id); if(!el) return;
+    new MutationObserver(()=>tidy(el)).observe(el,{childList:true,subtree:true});
+  });
 })();
 </script>
 </body>
