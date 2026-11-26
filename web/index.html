@@ -1193,7 +1193,14 @@ if(!window.XLSX){ var s=document.createElement('script'); s.textContent=document
      gọi đến, nhắn đến), vào ngày giờ nào, vị trí thường xuyên và hành trình
      di chuyển theo cell / địa chỉ trạm.
      ================================================================ */
-  const canon=v=>{ const d=normPhone(v); return (d.length>=11 && d.startsWith('84')) ? '0'+d.slice(2) : d; };
+  /* đưa mọi cách ghi về 1 dạng để 1 số chỉ tính 1 lần: 0988000222 = 84988000222 = +84 988 000 222 = 988000222 */
+  const canon=v=>{
+    let d=normPhone(v);
+    if(d.startsWith('0084')) d=d.slice(4);
+    if(d.length>=11 && d.startsWith('84')) d=d.slice(2);
+    if((d.length===9 || d.length===10) && !d.startsWith('0') && /^[1-9]/.test(d)) d='0'+d;
+    return d;
+  };
   const p2=n=>(''+n).padStart(2,'0');
   const fDate=d=>`${p2(d.getDate())}/${p2(d.getMonth()+1)}/${d.getFullYear()}`;
   const fDay=d=>`${p2(d.getDate())}/${p2(d.getMonth()+1)}`;
@@ -1348,24 +1355,26 @@ if(!window.XLSX){ var s=document.createElement('script'); s.textContent=document
   const noteOf=c=>[c.callOut&&`gọi đi ${c.callOut}`,c.callIn&&`gọi đến ${c.callIn}`,c.smsOut&&`nhắn đi ${c.smsOut}`,c.smsIn&&`nhắn đến ${c.smsIn}`].filter(Boolean).join(' · ');
   const KINDS={callOut:['SỐ CHÍNH GỌI ĐI NHIỀU NHẤT','cuộc gọi đi',true,'durOut'],smsOut:['SỐ CHÍNH NHẮN TIN ĐI NHIỀU NHẤT','tin nhắn đi',false],
                callIn:['SỐ GỌI ĐẾN SỐ CHÍNH NHIỀU NHẤT','cuộc gọi đến',true,'durIn'],smsIn:['SỐ NHẮN TIN ĐẾN SỐ CHÍNH NHIỀU NHẤT','tin nhắn đến',false]};
-  const LIM=30;
+  const TOP=10, TOP_TL=20;
+  const more=(i,lim)=>i>=lim?' class="rp-more"':'';
+  const togBtn=(n,unit)=>n>0?`<button type="button" class="rp-tog" data-n="${n}" data-unit="${unit}">▼ Hiện tất cả (thêm ${n} ${unit})</button>`:'';
   function kindTable(R,k){
     const [title,unit,isCall,durK]=KINDS[k];
     const list=R.contacts.filter(c=>c[k]>0).sort((a,b)=>b[k]-a[k]||(durK?b[durK]-a[durK]:0));
-    let h=`<h4>${title} <small>(${list.length} số)</small></h4>`;
+    const sum=list.reduce((a,c)=>a+c[k],0);
+    let h=`<h4>${title} <small>(${list.length} số khác nhau, tổng ${sum} ${isCall?'cuộc':'tin'})</small></h4>`;
     if(!list.length) return h+`<p class="rp-none">Không có ${unit}.</p>`;
-    h+=`<div class="rtable-wrap rp-tw"><table class="rtable"><thead><tr><th>STT</th><th>Số điện thoại</th><th>Số ${isCall?'cuộc':'tin'}</th>${isCall?'<th>Tổng thời lượng</th>':''}<th>Các ngày liên lạc</th><th>Lần đầu – lần cuối</th><th>Khung giờ chủ yếu</th>${R.hasLoc?'<th>Vị trí số chính khi liên lạc</th>':''}<th>Ghi chú (tổng gọi / nhắn)</th></tr></thead><tbody>`;
-    list.slice(0,LIM).forEach((c,i)=>{
+    h+=`<div class="rtable-wrap rp-tw rp-fold rp-collapsed"><table class="rtable"><thead><tr><th>STT</th><th>Số điện thoại</th><th>Số ${isCall?'cuộc':'tin'}</th>${isCall?'<th>Tổng thời lượng</th>':''}<th>Các ngày liên lạc</th><th>Lần đầu – lần cuối</th><th>Khung giờ chủ yếu</th>${R.hasLoc?'<th>Vị trí số chính khi liên lạc</th>':''}<th>Ghi chú (tổng gọi / nhắn)</th></tr></thead><tbody>`;
+    list.forEach((c,i)=>{
       const rs=c.recs.filter(r=>(r.dir==='out')===(k==='callOut'||k==='smsOut') && r.sms===!isCall);
       const tm=rs.filter(r=>r.dt);
-      h+=`<tr><td>${i+1}</td><td><b>${e(c.num)}</b></td><td>${c[k]}</td>${isCall?`<td>${fDur(c[durK])}</td>`:''}<td>${e(dayList(rs,8))}</td>`+
+      h+=`<tr${more(i,TOP)}><td>${i+1}</td><td><b>${e(c.num)}</b></td><td>${c[k]}</td>${isCall?`<td>${fDur(c[durK])}</td>`:''}<td>${e(dayList(rs,8))}</td>`+
         `<td>${tm.length?e(fDate(tm[0].dt)+' '+fTime(tm[0].dt)+' – '+fDate(tm[tm.length-1].dt)+' '+fTime(tm[tm.length-1].dt)):''}</td>`+
         `<td>${e(topBucket(tm.map(r=>r.dt.getHours())))}</td>`+
         (R.hasLoc?`<td>${topLocsOf(rs,2).map(l=>e(l.label)+` <small>(${l.n})</small>`).join('<br>')}</td>`:'')+
         `<td>${e(noteOf(c))}</td></tr>`;
     });
-    h+='</tbody></table></div>';
-    if(list.length>LIM) h+=`<p class="rp-none">… và ${list.length-LIM} số khác.</p>`;
+    h+='</tbody></table></div>'+togBtn(list.length-TOP,'số');
     return h;
   }
   function namesOf(R,k,n){
@@ -1378,12 +1387,14 @@ if(!window.XLSX){ var s=document.createElement('script'); s.textContent=document
     const nDays=new Set(tm.map(r=>dayKey(r.dt))).size;
     const both=R.contacts.filter(c=>(c.callOut+c.smsOut)>0&&(c.callIn+c.smsIn)>0).sort((a,b)=>b.total-a.total);
     const cond=readCond(net);
+    const nNum=k=>R.contacts.filter(c=>c[k]>0).length;
     let h=`<div class="rp-head"><h3>BÁO CÁO PHÂN TÍCH NỘI DUNG – SỐ ${e(R.A)}</h3>
       <p>Nhà mạng: <b>${label}</b>${P[net]&&P[net].sel?` · File: <b>${e(P[net].sel.name)}</b>`:''} · Dữ liệu: <b>${R.rows.toLocaleString()}</b> bản ghi đang có trong kết quả phân tích${cond.has?' (theo điều kiện lọc đang nhập)':''}${from?` · Từ <b>${from}</b> đến <b>${to}</b> (${nDays} ngày có liên lạc)`:''}.</p></div>`;
     // I. tóm tắt
     if(R.viaOwner) h+=`<p class="rp-note" style="color:var(--yellow)">⚠ File này là dữ liệu của thuê bao <b>${e(R.O)}</b>. Với số <b>${e(R.A)}</b> chỉ thống kê được các lần liên lạc giữa ${e(R.A)} và ${e(R.O)} (đã đổi chiều theo số ${e(R.A)}). Không có vị trí của ${e(R.A)} vì cell trong file là của ${e(R.O)}.</p>`;
     h+=`<h4>I. TÓM TẮT</h4><ul class="rp-sum">
-      <li>Số chính <b>${e(R.A)}</b> liên lạc với <b>${R.contacts.length}</b> số khác: gọi đi <b>${t.callOut}</b> cuộc (${fDur(t.durOut)}), gọi đến <b>${t.callIn}</b> cuộc (${fDur(t.durIn)}), nhắn tin đi <b>${t.smsOut}</b>, nhắn tin đến <b>${t.smsIn}</b>${t.other?`, ${t.other} bản ghi không xác định được chiều`:''}.</li>`;
+      <li>Số chính <b>${e(R.A)}</b> liên lạc với <b>${R.contacts.length}</b> số khác nhau (mỗi số chỉ tính 1 lần, dù liên lạc nhiều lần).</li>
+      <li>Gọi đi <b>${t.callOut}</b> cuộc tới <b>${nNum('callOut')}</b> số (${fDur(t.durOut)}); gọi đến <b>${t.callIn}</b> cuộc từ <b>${nNum('callIn')}</b> số (${fDur(t.durIn)}); nhắn tin đi <b>${t.smsOut}</b> tin tới <b>${nNum('smsOut')}</b> số; nhắn tin đến <b>${t.smsIn}</b> tin từ <b>${nNum('smsIn')}</b> số${t.other?`; ${t.other} bản ghi không xác định được chiều`:''}.</li>`;
     [['callOut','Gọi đi nhiều nhất tới'],['smsOut','Nhắn tin đi nhiều nhất tới'],['callIn','Gọi đến nhiều nhất từ'],['smsIn','Nhắn tin đến nhiều nhất từ']].forEach(([k,txt])=>{
       const s=namesOf(R,k,3); if(s) h+=`<li>${txt}: ${e(s)}.</li>`; });
     if(both.length) h+=`<li>Liên lạc hai chiều thường xuyên nhất: ${both.slice(0,3).map(c=>`<b>${e(c.num)}</b> (${e(noteOf(c))})`).join('; ')}.</li>`;
@@ -1401,12 +1412,11 @@ if(!window.XLSX){ var s=document.createElement('script'); s.textContent=document
     else if(!R.hasLoc) h+='<p class="rp-none">File không có cột cell / địa chỉ trạm.</p>';
     else if(!R.locs.length) h+='<p class="rp-none">Không có dữ liệu vị trí trong các dòng đang xem.</p>';
     else{
-      h+=`<p class="rp-note">Vị trí là trạm / cell mà số chính đang kết nối khi phát sinh cuộc gọi, tin nhắn.</p><div class="rtable-wrap rp-tw"><table class="rtable"><thead><tr><th>STT</th><th>Địa chỉ / Cell</th><th>Số lần</th><th>Số ngày</th><th>Khung giờ chủ yếu</th><th>Lần đầu – lần cuối</th><th>Nhận định</th></tr></thead><tbody>`;
-      R.locs.slice(0,LIM).forEach((l,i)=>h+=`<tr><td>${i+1}</td><td>${e(l.label)}</td><td>${l.n}</td><td>${l.days.size}</td><td>${e(topBucket(l.hours))}</td><td>${e(fDate(l.first)+' '+fTime(l.first)+' – '+fDate(l.last)+' '+fTime(l.last))}</td><td>${e(locNote(l))}</td></tr>`);
-      h+='</tbody></table></div>';
-      if(R.locs.length>LIM) h+=`<p class="rp-none">… và ${R.locs.length-LIM} vị trí khác.</p>`;
+      h+=`<p class="rp-note">Vị trí là trạm / cell mà số chính đang kết nối khi phát sinh cuộc gọi, tin nhắn.</p><div class="rtable-wrap rp-tw rp-fold rp-collapsed"><table class="rtable"><thead><tr><th>STT</th><th>Địa chỉ / Cell</th><th>Số lần</th><th>Số ngày</th><th>Khung giờ chủ yếu</th><th>Lần đầu – lần cuối</th><th>Nhận định</th></tr></thead><tbody>`;
+      R.locs.forEach((l,i)=>h+=`<tr${more(i,TOP)}><td>${i+1}</td><td>${e(l.label)}</td><td>${l.n}</td><td>${l.days.size}</td><td>${e(topBucket(l.hours))}</td><td>${e(fDate(l.first)+' '+fTime(l.first)+' – '+fDate(l.last)+' '+fTime(l.last))}</td><td>${e(locNote(l))}</td></tr>`);
+      h+='</tbody></table></div>'+togBtn(R.locs.length-TOP,'vị trí');
       if(R.trans.length){
-        h+='<h4>Các lần di chuyển lặp lại nhiều nhất</h4><ul class="rp-sum">'+R.trans.slice(0,10).map(([k,n])=>`<li>${e(k)}: <b>${n}</b> lần</li>`).join('')+'</ul>';
+        h+='<h4>Các lần di chuyển lặp lại nhiều nhất</h4><ul class="rp-sum rp-fold rp-collapsed">'+R.trans.map(([k,n],i)=>`<li${more(i,TOP)}>${e(k)}: <b>${n}</b> lần</li>`).join('')+'</ul>'+togBtn(R.trans.length-TOP,'lượt di chuyển');
       }
       // VII. hành trình theo ngày
       h+='<h4 class="rp-sec">IV. HÀNH TRÌNH DI CHUYỂN THEO NGÀY</h4><div class="rp-days">';
@@ -1419,17 +1429,18 @@ if(!window.XLSX){ var s=document.createElement('script'); s.textContent=document
       h+='</div>';
     }
     // VIII. chi tiết các số liên lạc nhiều nhất
-    const top=[...R.contacts].sort((a,b)=>b.total-a.total).slice(0,10);
+    const top=[...R.contacts].sort((a,b)=>b.total-a.total);
     if(top.length){
-      h+='<h4 class="rp-sec">V. CHI TIẾT 10 SỐ LIÊN LẠC NHIỀU NHẤT (ngày giờ, loại, vị trí số chính)</h4>';
+      h+=`<h4 class="rp-sec">V. CHI TIẾT CÁC SỐ LIÊN LẠC (ngày giờ, loại, vị trí số chính) <small>– ${top.length} số, hiện ${Math.min(TOP,top.length)} số nhiều nhất</small></h4><div class="rp-fold rp-collapsed">`;
       top.forEach((c,i)=>{
         const tl=c.recs.filter(r=>r.dt);
         const path=[]; tl.forEach(r=>{ if(r.loc && (!path.length||path[path.length-1]!==r.loc.short)) path.push(r.loc.short); });
-        h+=`<details><summary><b>${i+1}. ${e(c.num)}</b> – ${c.total} lần (${e(noteOf(c))})${c.durOut+c.durIn?`, tổng gọi ${fDur(c.durOut+c.durIn)}`:''}</summary>`;
+        h+=`<details${more(i,TOP)}><summary><b>${i+1}. ${e(c.num)}</b> – ${c.total} lần (${e(noteOf(c))})${c.durOut+c.durIn?`, tổng gọi ${fDur(c.durOut+c.durIn)}`:''}</summary>`;
         if(path.length>1) h+=`<p class="rp-note">Vị trí số chính qua các lần liên lạc: ${path.slice(0,12).map(e).join(' → ')}${path.length>12?' → …':''}</p>`;
-        h+='<ol>'+tl.slice(0,60).map(r=>`<li>${fDate(r.dt)} ${fTime(r.dt)} – ${r.dir==='out'?(r.sms?'Nhắn đi':'Gọi đi'):(r.sms?'Nhắn đến':'Gọi đến')}${!r.sms&&r.dur?' '+fDur(r.dur):''}${r.loc?' – tại '+e(r.loc.label):''}</li>`).join('')+
-          (tl.length>60?`<li>… và ${tl.length-60} lần khác</li>`:'')+'</ol></details>';
+        h+='<ol class="rp-fold rp-collapsed">'+tl.map((r,j)=>`<li${more(j,TOP_TL)}>${fDate(r.dt)} ${fTime(r.dt)} – ${r.dir==='out'?(r.sms?'Nhắn đi':'Gọi đi'):(r.sms?'Nhắn đến':'Gọi đến')}${!r.sms&&r.dur?' '+fDur(r.dur):''}${r.loc?' – tại '+e(r.loc.label):''}</li>`).join('')+
+          '</ol>'+togBtn(tl.length-TOP_TL,'lần liên lạc')+'</details>';
       });
+      h+='</div>'+togBtn(top.length-TOP,'số');
     }
     return h;
   }
@@ -1453,6 +1464,9 @@ if(!window.XLSX){ var s=document.createElement('script'); s.textContent=document
     .rp-body summary{cursor:pointer;}
     .rp-body details ol{margin:6px 0 2px 22px;}
     .rp-body details li{margin:2px 0;}
+    .rp-collapsed > .rp-more, .rp-collapsed > table > tbody > .rp-more{display:none;}
+    .rp-tog{display:block;margin:6px 0 4px;padding:5px 12px;border:1px dashed var(--blue);border-radius:6px;background:#f5f8ff;color:var(--blue);font-weight:600;font-size:12.5px;cursor:pointer;}
+    .rp-tog:hover{background:#eaf1ff;}
   </style>`);
   NETS_LIST.forEach(net=>{
     const runBtn=document.querySelector(`#tab-${net} .btn-row .btn-green`); if(!runBtn) return;
@@ -1474,6 +1488,12 @@ if(!window.XLSX){ var s=document.createElement('script'); s.textContent=document
       catch(_){ const r=document.createRange(); r.selectNodeContents($('rpbody-'+net)); const s=getSelection(); s.removeAllRanges(); s.addRange(r); $('rpmsg-'+net).textContent='Đã bôi đen, nhấn Ctrl+C để sao chép.'; }
     });
     $('rpdoc-'+net).addEventListener('click',()=>exportDoc(net));
+    $('rpbody-'+net).addEventListener('click',ev=>{
+      const b=ev.target.closest('.rp-tog'); if(!b) return;
+      const box=b.previousElementSibling; if(!box) return;
+      const open=box.classList.toggle('rp-collapsed')===false;
+      b.textContent=open ? '▲ Thu gọn' : `▼ Hiện tất cả (thêm ${b.dataset.n} ${b.dataset.unit})`;
+    });
   });
   const _clearAll2=window.clearAll;
   window.clearAll=function(net){ _clearAll2(net); const w=$('rp-'+net); if(w){ w.classList.add('hidden'); $('rpbody-'+net).innerHTML=''; } };
@@ -1503,6 +1523,8 @@ if(!window.XLSX){ var s=document.createElement('script'); s.textContent=document
   async function exportDoc(net){
     const body=$('rpbody-'+net).cloneNode(true);
     body.querySelectorAll('details').forEach(d=>d.setAttribute('open',''));
+    body.querySelectorAll('.rp-collapsed').forEach(x=>x.classList.remove('rp-collapsed'));
+    body.querySelectorAll('.rp-tog').forEach(x=>x.remove());
     const A=$('rpnum-'+net).value||'so';
     const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>Báo cáo ${e(A)}</title>
       <style>body{font-family:'Times New Roman',serif;font-size:13pt;} h3{font-size:15pt;text-align:center;} h4{font-size:13pt;margin:12pt 0 4pt;}
