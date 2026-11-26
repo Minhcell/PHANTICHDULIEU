@@ -274,6 +274,15 @@ jobs:
           ipcMain.handle("store:readFile", (e, sub, name) => fs.readFileSync(filePath(sub, name)));
           ipcMain.handle("store:readTexts", (e, sub, names) => readTexts(sub, names));
           ipcMain.handle("store:reveal", (e, p) => { if (p) shell.showItemInFolder(p); return true; });
+          // mở thư mục dữ liệu của 1 nhà mạng trong Windows Explorer (để copy file Excel vào)
+          ipcMain.handle("store:openFolder", async (e, sub) => {
+            if (!dataDir) throw new Error("Chưa chọn thư mục dữ liệu");
+            const dir = path.join(dataDir, safeSub(sub));
+            fs.mkdirSync(dir, { recursive: true });
+            const err = await shell.openPath(dir);
+            if (err) throw new Error(err);
+            return dir;
+          });
           ipcMain.handle("store:lanStatus", () => lanStatus());
           ipcMain.handle("store:lanSet", async (e, cfg) => {
             const port = parseInt(cfg && cfg.port, 10);
@@ -296,6 +305,8 @@ jobs:
           app.whenReady().then(async () => {
             Menu.setApplicationMenu(null);
             dataDir = findDataDir();
+            // luôn có sẵn thư mục cho từng nhà mạng
+            if (dataDir) for (const sub of SUBS) { try { fs.mkdirSync(path.join(dataDir, sub), { recursive: true }); } catch {} }
             if (dataDir) { loadKho(); loadLan(); await applyLan(); }
             createWindow();
           });
@@ -316,6 +327,7 @@ jobs:
             readFile: (sub, name) => ipcRenderer.invoke("store:readFile", sub, name),
             readTexts: (sub, names) => ipcRenderer.invoke("store:readTexts", sub, names),
             reveal: (p) => ipcRenderer.invoke("store:reveal", p),
+            openFolder: (sub) => ipcRenderer.invoke("store:openFolder", sub),
             lanStatus: () => ipcRenderer.invoke("store:lanStatus"),
             lanSet: (cfg) => ipcRenderer.invoke("store:lanSet", cfg)
           });

@@ -1675,5 +1675,271 @@ if(!window.XLSX){ var s=document.createElement('script'); s.textContent=document
   });
 })();
 </script>
+<script>
+/* ================================================================
+   PHẦN THÊM: Ô "SỐ CHỦ" + THƯ MỤC DỮ LIỆU TỪNG NHÀ MẠNG
+   - File Excel nhà mạng đặt tên theo số điện thoại (VD 0912345678.xlsx),
+     để trong thư mục của nhà mạng: PhanTich_DuLieu\TepDaPhanTich\viettel | mobi | vina
+     (copy tay vào thư mục hoặc phân tích trong app đều được).
+   - Gõ vào ô Số chủ: hiện các số tương ứng (gõ vài số hoặc đủ số), chọn số -> phân tích file đó.
+   Không sửa code cũ: chỉ nạp file đã chọn vào ô chọn file rồi gọi hàm Phân tích sẵn có.
+   ================================================================ */
+(function(){
+  const NETS_LIST=['viettel','mobi','vina'];
+  const LABEL={viettel:'Viettel',mobi:'MobiFone',vina:'VinaPhone'};
+  const $=id=>document.getElementById(id);
+  const e=s=>(''+(s==null?'':s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const NS=window.NativeStore, AS=window.AndroidStore;
+  const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k));}catch(_){return null;}};
+  const sub=net=>'TepDaPhanTich/'+net;
+  const DATA_RE=/\.(xlsx|xls|csv)$/i;
+  const toB64=buf=>{const u=new Uint8Array(buf);let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s);};
+  const stamp=()=>{const d=new Date(),p=n=>(''+n).padStart(2,'0');return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;};
+  const fromB64=b=>{const s=atob(b);const u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u.buffer;};
+
+  /* ---------- đọc thư mục: máy này (exe/apk) hoặc máy chủ LAN ---------- */
+  let SRC=null, rootFolder='', readyDone;
+  const ready=new Promise(r=>readyDone=r);   // các nút chờ tới khi biết thư mục ở đâu
+  async function need(net){
+    await ready;
+    if(!SRC){ setStatus(net,'status-err','❌ Chưa có nơi lưu file.'); return false; }
+    if(SRC.kind==='exe'||SRC.kind==='apk'){
+      try{ const st=NS?await NS.status():JSON.parse(AS.status()); if(!st.configured){ alert('Hãy chọn thư mục lưu dữ liệu trước (màn hình Chọn nơi lưu dữ liệu).'); return false; } }catch(_){}
+    }
+    return true;
+  }
+  async function detect(){
+    let rc=lsGet('ptcg_remote');
+    if(!rc && !NS && !AS && /^https?:$/.test(location.protocol)){
+      try{ const j=await (await fetch(location.origin+'/api/info',{cache:'no-store'})).json(); if(j&&j.app==='PhanTichCuocGoi') rc={url:location.origin,pass:lsGet('ptcg_pass')||''}; }catch(_){}
+    }
+    if(rc){
+      const call=async(path,bin)=>{ const r=await fetch(rc.url+path,{cache:'no-store',headers:{'X-Pass':encodeURIComponent(rc.pass||'')}});
+        if(r.status===401) throw new Error('Chưa nhập đúng mật khẩu máy chủ LAN.'); if(!r.ok) throw new Error('Máy chủ báo lỗi '+r.status); return bin?r.arrayBuffer():r.json(); };
+      const q=(s,n)=>'?sub='+encodeURIComponent(s)+(n?'&name='+encodeURIComponent(n):'');
+      return { kind:'remote', where:'máy chủ LAN '+rc.url.replace(/^https?:\/\//,''),
+        list: async s=>((await call('/api/files'+q(s))).files||[]),
+        get:  (s,n)=>call('/api/file'+q(s,n),true),
+        save: async(s,n,buf)=>{ const r=await fetch(rc.url+'/api/file'+q(s,n),{method:'POST',headers:{'X-Pass':encodeURIComponent(rc.pass||''),'Content-Type':'application/octet-stream'},body:buf});
+          if(r.status===401) throw new Error('Chưa nhập đúng mật khẩu máy chủ LAN.'); if(!r.ok) throw new Error('Máy chủ báo lỗi '+r.status); return (await r.json()).path; } };
+    }
+    if(NS && NS.listFiles){
+      return { kind:'exe', list:s=>NS.listFiles(s),
+        get: async(s,n)=>{ const b=await NS.readFile(s,n); return b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength); },
+        save: (s,n,buf)=>NS.saveFile(s,n,new Uint8Array(buf)) };
+    }
+    if(AS && AS.listFiles){
+      return { kind:'apk', list: async s=>{ try{ return JSON.parse(AS.listFiles(s)); }catch(_){ return []; } },
+        get: async(s,n)=>{ const r=AS.readFile(s,n); if(r.startsWith('ERR')) throw new Error(r.slice(4)); return fromB64(r); },
+        save: async(s,n,buf)=>{ const r=AS.saveFile(s,n,toB64(buf)); if(r.startsWith('ERR')) throw new Error(r.slice(4)); return r; } };
+    }
+    return idbStore();   // trình duyệt thường (XAMPP): lưu trong bộ nhớ trình duyệt
+  }
+  /* "thư mục" trong bộ nhớ trình duyệt (IndexedDB), mỗi nhà mạng 1 nhóm, tải lại trang vẫn còn */
+  function idbStore(){
+    if(!window.indexedDB) return null;
+    let dbp=null;
+    const db=()=>dbp||(dbp=new Promise((res,rej)=>{ const r=indexedDB.open('ptcg_sochu',1);
+      r.onupgradeneeded=()=>{ const d=r.result; d.createObjectStore('meta',{keyPath:'k'}); d.createObjectStore('data',{keyPath:'k'}); };
+      r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }));
+    const tx=(stores,mode,fn)=>db().then(d=>new Promise((res,rej)=>{ const t=d.transaction(stores,mode); const out=fn(t); t.oncomplete=()=>res(out&&out.result!==undefined?out.result:out); t.onerror=()=>rej(t.error); }));
+    return { kind:'browser', where:'bộ nhớ trình duyệt',
+      list: async s=>((await tx('meta','readonly',t=>t.objectStore('meta').getAll()))||[]).filter(m=>m.sub===s).map(m=>({name:m.name,size:m.size,time:m.time})),
+      get:  async(s,n)=>{ const r=await tx('data','readonly',t=>t.objectStore('data').get(s+'/'+n)); if(!r) throw new Error('Không tìm thấy file '+n); return r.data; },
+      save: async(s,n,buf)=>{ const k=s+'/'+n; await tx(['meta','data'],'readwrite',t=>{ t.objectStore('data').put({k,data:buf}); t.objectStore('meta').put({k,sub:s,name:n,size:buf.byteLength,time:Date.now()}); }); return 'bộ nhớ trình duyệt'; } };
+  }
+
+  function phoneOf(name){
+    const base=name.replace(DATA_RE,'');
+    const runs=base.match(/\d{8,}/g); if(!runs) return base;
+    let d=runs.sort((a,b)=>b.length-a.length)[0];
+    if(d.startsWith('0084')) d=d.slice(4);
+    if(d.length>=11 && d.startsWith('84')) d='0'+d.slice(2);
+    if((d.length===9||d.length===10) && /^[1-9]/.test(d)) d='0'+d;
+    return d;
+  }
+  const FILES={};
+  async function getFiles(net){
+    if(!SRC) return [];
+    const all=await SRC.list(sub(net));
+    FILES[net]=all.filter(f=>f && DATA_RE.test(f.name))
+      .map(f=>({name:f.name,size:f.size,time:f.time,phone:phoneOf(f.name)}))
+      .sort((a,b)=>a.phone.localeCompare(b.phone)||(b.time||0)-(a.time||0));
+    return FILES[net];
+  }
+
+  /* ---------- giao diện ---------- */
+  document.head.insertAdjacentHTML('beforeend',`<style>
+    .sc-box{position:relative;}
+    .sc-wrap{display:flex;gap:6px;align-items:center;}
+    .sc-in{position:relative;display:flex;align-items:center;}
+    .sc-in input{padding-right:24px!important;min-width:190px;font-family:Consolas,monospace;}
+    .sc-clr{position:absolute;right:7px;cursor:pointer;color:#999;font-size:13px;display:none;}
+    .sc-clr:hover{color:var(--red);}
+    .sc-open{padding:5px 9px;border:1px solid var(--border);border-radius:5px;background:#fff;cursor:pointer;font-size:13px;white-space:nowrap;}
+    .sc-open:hover{border-color:var(--blue);color:var(--blue);}
+    .sc-add{background:var(--green);color:#fff;border-color:var(--green);font-weight:600;}
+    .sc-add:hover{filter:brightness(.92);color:#fff;border-color:var(--green);}
+    .sc-count{font-weight:400;color:var(--muted);margin-left:4px;}
+    .sc-dd{position:absolute;top:100%;left:0;min-width:300px;max-width:92vw;background:#fff;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.15);max-height:320px;overflow-y:auto;z-index:70;display:none;}
+    .sc-dd.show{display:block;}
+    .sc-head{padding:6px 10px;font-size:11.5px;color:var(--muted);background:#f9fafb;border-bottom:1px solid var(--border);position:sticky;top:0;word-break:break-all;}
+    .sc-item{padding:6px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #f1f1f1;display:flex;gap:8px;align-items:baseline;}
+    .sc-item:hover,.sc-item.act{background:#eff6ff;}
+    .sc-item b{font-family:Consolas,monospace;font-size:13px;}
+    .sc-item b mark{background:#fde68a;padding:0;}
+    .sc-item span{color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+    .sc-empty{padding:9px 10px;color:#888;font-size:12.5px;line-height:1.45;}
+  </style>`);
+
+  NETS_LIST.forEach(net=>{
+    const fileEl=$('file-'+net); if(!fileEl) return;
+    // đặt sau ô "Hoặc tệp đã lưu" (nếu có), không thì sau ô chọn file
+    const after=($('saved-'+net)&&$('saved-'+net).closest('.filter-group')) || fileEl.closest('.filter-group');
+    after.insertAdjacentHTML('afterend',
+      `<div class="filter-group sc-box hidden" id="scbox-${net}"><label>Số chủ<span class="sc-count" id="sccount-${net}"></span></label>
+        <div class="sc-wrap"><div class="sc-in"><input type="text" id="sc-${net}" placeholder="Gõ số chủ để tìm…" autocomplete="off" inputmode="numeric"><span class="sc-clr" id="scclr-${net}" title="Xoá">✕</span></div>
+        <button type="button" class="sc-open sc-add" id="scadd-${net}" title="Thêm file Excel ${LABEL[net]} vào thư mục (chọn được nhiều file)">➕ Add file</button>
+        <input type="file" id="scfile-${net}" accept=".xlsx,.xls,.csv" multiple hidden>
+        <button type="button" class="sc-open hidden" id="scopen-${net}" title="Mở thư mục ${LABEL[net]} để copy file Excel vào">📂 Mở thư mục</button></div>
+        <div class="sc-dd" id="scdd-${net}"></div></div>`);
+    const inp=$('sc-'+net), dd=$('scdd-'+net);
+    let act=-1;
+    const items=()=>[...dd.querySelectorAll('.sc-item')];
+    inp.addEventListener('focus',()=>openDD(net));
+    inp.addEventListener('click',()=>{ if(!dd.classList.contains('show')) openDD(net); });
+    inp.addEventListener('input',()=>{ $('scclr-'+net).style.display=inp.value?'block':'none'; act=-1; render(net); dd.classList.add('show'); });
+    inp.addEventListener('keydown',ev=>{
+      const its=items();
+      if(ev.key==='ArrowDown'||ev.key==='ArrowUp'){ ev.preventDefault(); if(!its.length) return; act=(act+(ev.key==='ArrowDown'?1:-1)+its.length)%its.length; its.forEach((x,i)=>x.classList.toggle('act',i===act)); its[act].scrollIntoView({block:'nearest'}); return; }
+      if(ev.key==='Escape'){ dd.classList.remove('show'); return; }
+      if(ev.key!=='Enter') return;
+      ev.preventDefault();
+      if(act>=0 && its[act]){ pick(net,its[act].dataset.name); return; }
+      const list=match(net), qd=inp.value.replace(/\D/g,'');
+      const exact=list.filter(f=>f.phone===qd || f.phone.replace(/^0/,'')===qd.replace(/^0/,''));
+      const f=exact.length===1?exact[0]:(list.length===1?list[0]:null);
+      if(f) pick(net,f.name);
+      else { render(net,qd&&!list.length?'Không có file nào của số '+qd+' trong thư mục.':''); dd.classList.add('show'); }
+    });
+    dd.addEventListener('mousedown',ev=>ev.preventDefault());
+    dd.addEventListener('click',ev=>{ const it=ev.target.closest('.sc-item'); if(it) pick(net,it.dataset.name); });
+    $('scclr-'+net).addEventListener('click',()=>{ inp.value=''; $('scclr-'+net).style.display='none'; inp.focus(); });
+    $('scadd-'+net).addEventListener('click',()=>$('scfile-'+net).click());
+    $('scfile-'+net).addEventListener('change',()=>{ const fs=[...$('scfile-'+net).files]; $('scfile-'+net).value=''; if(fs.length) addFiles(net,fs); });
+    $('scopen-'+net).addEventListener('click',async()=>{
+      try{ await NS.openFolder(sub(net)); }catch(er){ alert('Không mở được thư mục: '+(er.message||er)); }
+    });
+  });
+  document.addEventListener('click',ev=>{
+    NETS_LIST.forEach(net=>{ const b=$('scbox-'+net); if(b && !b.contains(ev.target)) $('scdd-'+net).classList.remove('show'); });
+  });
+
+  function match(net){
+    const q=$('sc-'+net).value.trim(), qd=q.replace(/\D/g,''), ql=q.toLowerCase();
+    const list=FILES[net]||[];
+    if(!q) return list;
+    return list.filter(f=>(qd && (f.phone.includes(qd) || f.phone.replace(/^0/,'').includes(qd.replace(/^0/,'')))) || f.name.toLowerCase().includes(ql));
+  }
+  function hl(phone,qd){
+    if(!qd) return e(phone);
+    let i=phone.indexOf(qd), n=qd.length;
+    if(i<0){ const q2=qd.replace(/^0/,''); i=phone.indexOf(q2); n=q2.length; }
+    return i<0 ? e(phone) : e(phone.slice(0,i))+'<mark>'+e(phone.slice(i,i+n))+'</mark>'+e(phone.slice(i+n));
+  }
+  function folderText(net){ return SRC.kind==='remote' ? `Thư mục ${LABEL[net]} trên ${SRC.where}` : SRC.kind==='browser' ? `Thư mục ${LABEL[net]} trong bộ nhớ trình duyệt này` : `Thư mục: ${rootFolder?rootFolder+(SRC.kind==='exe'?'\\':'/'):''}TepDaPhanTich${SRC.kind==='exe'?'\\':'/'}${net}`; }
+  function render(net,msg){
+    const dd=$('scdd-'+net), list=FILES[net];
+    if(!list){ dd.innerHTML='<div class="sc-empty">Đang đọc thư mục…</div>'; return; }
+    const m=match(net), qd=$('sc-'+net).value.replace(/\D/g,''), LIM=300;
+    let h=`<div class="sc-head">${e(folderText(net))} · ${list.length} file${$('sc-'+net).value?` · ${m.length} số phù hợp`:''}</div>`;
+    if(msg) h+=`<div class="sc-empty">${e(msg)}</div>`;
+    else if(!list.length) h+=`<div class="sc-empty">Chưa có file nào. Bấm <b>➕ Add file</b> để thêm file Excel ${LABEL[net]} (đặt tên theo số điện thoại, VD 0912345678.xlsx)${SRC.kind==='exe'?', hoặc bấm 📂 Mở thư mục rồi copy file vào':''}.</div>`;
+    else if(!m.length) h+='<div class="sc-empty">Không có số phù hợp.</div>';
+    const dup={}; list.forEach(f=>dup[f.phone]=(dup[f.phone]||0)+1);
+    h+=m.slice(0,LIM).map(f=>`<div class="sc-item" data-name="${e(f.name)}"><b>${hl(f.phone,qd)}</b><span>${(dup[f.phone]>1||f.name.replace(DATA_RE,'')!==f.phone)?e(f.name):''}</span></div>`).join('');
+    if(m.length>LIM) h+=`<div class="sc-empty">… còn ${m.length-LIM} số, gõ thêm để thu hẹp.</div>`;
+    dd.innerHTML=h;
+  }
+  async function openDD(net){
+    const dd=$('scdd-'+net);
+    if(!SRC){ dd.innerHTML='<div class="sc-empty">Đang mở thư mục…</div>'; dd.classList.add('show'); if(!(await need(net))) return; }
+    render(net); dd.classList.add('show');
+    try{ await getFiles(net); }catch(er){ render(net,er.message||String(er)); return; }
+    $('sccount-'+net).textContent=FILES[net].length?`(${FILES[net].length} số)`:'';
+    render(net);
+  }
+  /* thêm file vào thư mục nhà mạng: trùng tên + trùng dung lượng thì bỏ qua, trùng tên khác dung lượng thì giữ cả hai */
+  async function addFiles(net,files){
+    if(!(await need(net))) return;
+    const btn=$('scadd-'+net); btn.disabled=true;
+    let added=[], skipped=0, failed=[];
+    try{
+      const have=await getFiles(net);
+      for(let i=0;i<files.length;i++){
+        const f=files[i];
+        setProgress(net,Math.round(i*100/files.length),`Đang thêm ${i+1}/${files.length}: ${f.name}`);
+        if(!DATA_RE.test(f.name)){ failed.push(f.name+' (không phải file Excel/CSV)'); continue; }
+        if(have.some(x=>x.name===f.name && x.size===f.size)){ skipped++; continue; }
+        const name=have.some(x=>x.name===f.name) ? stamp()+'_'+f.name : f.name;
+        try{ await SRC.save(sub(net),name,await f.arrayBuffer()); added.push(name); have.push({name,size:f.size}); }
+        catch(er){ failed.push(f.name+' ('+(er.message||er)+')'); }
+      }
+    }catch(er){ failed.push(er.message||String(er)); }
+    hideProgress(net); btn.disabled=false;
+    const list=await getFiles(net).catch(()=>FILES[net]||[]);
+    $('sccount-'+net).textContent=list.length?`(${list.length} số)`:'';
+    const parts=[];
+    if(added.length) parts.push(`✅ Đã thêm ${added.length} file vào ${folderText(net).replace(/^Thư mục: /,'thư mục ').replace(/^Thư mục/,'thư mục')}`);
+    if(skipped) parts.push(`${skipped} file đã có sẵn, không thêm trùng`);
+    if(failed.length) parts.push(`❌ Lỗi: ${failed.join('; ')}`);
+    setStatus(net, failed.length&&!added.length?'status-err':'status-ok', parts.join('. ')+'.');
+    // thêm đúng 1 file: chọn luôn số đó và phân tích
+    if(added.length===1 && !failed.length) pick(net,added[0]);
+  }
+  async function pick(net,name){
+    const f=(FILES[net]||[]).find(x=>x.name===name); if(!f) return;
+    const inp=$('sc-'+net);
+    inp.value=f.phone; $('scclr-'+net).style.display='block';
+    $('scdd-'+net).classList.remove('show'); inp.blur();
+    setStatus(net,'status-idle','⏳ Đang mở file '+f.name+'…');
+    try{
+      const buf=await SRC.get(sub(net),f.name);
+      const dt=new DataTransfer(); dt.items.add(new File([buf],f.name)); $('file-'+net).files=dt.files;
+      const sel=$('saved-'+net); if(sel) sel.value='';
+    }catch(er){ setStatus(net,'status-err','❌ Không mở được file '+f.name+': '+(er.message||er)); return; }
+    STATE[net].RAW=null; STATE[net].LAST_RESULT=null;
+    window.runAnalyze(net);
+  }
+
+  (async function init(){
+    try{ SRC=await detect(); }catch(_){ SRC=null; }
+    readyDone();
+    if(!SRC) return;
+    if(SRC.kind==='exe' || SRC.kind==='apk'){
+      try{ const st=NS?await NS.status():JSON.parse(AS.status()); rootFolder=st.folder||''; if(!st.configured) return setTimeout(init,2000); }catch(_){}
+    }
+    NETS_LIST.forEach(net=>{ $('scbox-'+net).classList.remove('hidden'); if(SRC.kind==='exe' && NS.openFolder) $('scopen-'+net).classList.remove('hidden'); });
+    if(SRC.kind==='browser') NETS_LIST.forEach(net=>$('scadd-'+net).title='Thêm file Excel vào bộ nhớ trình duyệt (chọn được nhiều file)');
+    NETS_LIST.forEach(net=>getFiles(net).then(l=>{ $('sccount-'+net).textContent=l.length?`(${l.length} số)`:''; }).catch(()=>{}));
+  })();
+})();
+</script>
+<script>
+/* PHẦN THÊM: nhấn Enter trong các ô đăng nhập / đăng ký / admin / đổi mật khẩu là chạy luôn nút chính */
+(function(){
+  const MAP=[['m-login','doLogin'],['m-admin','doAdminLogin'],['m-register','doRegister'],['m-chpass','doChangePass']];
+  document.addEventListener('keydown',ev=>{
+    if(ev.key!=='Enter' || ev.isComposing || ev.repeat) return;
+    const t=ev.target; if(!t || t.tagName!=='INPUT') return;
+    for(const [id,fn] of MAP){
+      const box=document.getElementById(id);
+      if(box && box.contains(t) && !box.classList.contains('hidden') && typeof window[fn]==='function'){
+        ev.preventDefault(); window[fn](); return;
+      }
+    }
+  });
+})();
+</script>
 </body>
 </html>
